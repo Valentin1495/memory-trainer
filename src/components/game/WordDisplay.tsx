@@ -21,10 +21,14 @@ export function WordDisplay({ words, wordDurationMs, difficulty, onComplete }: W
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showWord, setShowWord] = useState(true);
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
 
   const variants = WORD_VARIANTS[difficulty];
 
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (displayPhase !== 'countdown') return;
     if (countdown <= 0) {
@@ -36,6 +40,7 @@ export function WordDisplay({ words, wordDurationMs, difficulty, onComplete }: W
     const id = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(id);
   }, [displayPhase, countdown]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (displayPhase !== 'flashing') return;

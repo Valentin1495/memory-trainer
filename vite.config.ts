@@ -8,7 +8,7 @@ export default defineConfig({
     host: true, // 외부 접속 허용
     port: 5173,
     hmr: {
-      host: '192.168.123.105', // 본인의 로컬 IP
+      host: '192.168.123.107', // 본인의 로컬 IP
       port: 5173,
     },
   },

@@ -16,15 +16,15 @@ const DEMO_CATEGORY: DailyCategory = {
   date: new Date().toISOString().split('T')[0],
   name: '과일',
   words: [
-    { id: '1',  word: '사과' },
-    { id: '2',  word: '바나나' },
-    { id: '3',  word: '포도' },
-    { id: '4',  word: '수박' },
-    { id: '5',  word: '딸기' },
-    { id: '6',  word: '오렌지' },
-    { id: '7',  word: '키위' },
-    { id: '8',  word: '망고' },
-    { id: '9',  word: '복숭아' },
+    { id: '1', word: '사과' },
+    { id: '2', word: '바나나' },
+    { id: '3', word: '포도' },
+    { id: '4', word: '수박' },
+    { id: '5', word: '딸기' },
+    { id: '6', word: '오렌지' },
+    { id: '7', word: '키위' },
+    { id: '8', word: '망고' },
+    { id: '9', word: '복숭아' },
     { id: '10', word: '체리' },
     { id: '11', word: '레몬' },
     { id: '12', word: '자두' },
@@ -55,7 +55,7 @@ export function useGame() {
     setNickname,
     startGame,
     selectWord,
-    useReview,
+    useReview: incrementReviewCount,
     resetGame,
     getScore,
     getMissedWords,
@@ -128,7 +128,6 @@ export function useGame() {
       }
     }, getMsUntilMidnight());
     return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartMemorize = useCallback(() => {
@@ -141,8 +140,8 @@ export function useGame() {
 
   const handleReviewRequest = useCallback(() => {
     setShowReviewModal(true);
-    useReview();
-  }, [useReview]);
+    incrementReviewCount();
+  }, [incrementReviewCount]);
 
   const handleCloseReview = useCallback(() => {
     setShowReviewModal(false);

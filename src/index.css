@@ -27,6 +27,14 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* fixed 요소용 safe area 오프셋 */
+.safe-top-fixed {
+  top: calc(env(safe-area-inset-top) + 1rem);
+}
+.safe-right-fixed {
+  right: calc(env(safe-area-inset-right) + 1rem);
+}
+
 /* iOS 입력창 포커스 시 자동 확대 방지 (font-size < 16px 이면 iOS가 확대함) */
 input,
 textarea,

@@ -141,7 +141,7 @@ export function Game() {
                 </svg>
                 다시 보기
                 {reviewCount > 0 && (
-                  <span className="text-white/50 text-sm">({reviewCount}회 · -{reviewCount * 150}점)</span>
+                  <span className="text-white/50 text-sm">({reviewCount}회 | -{reviewCount * 150}점)</span>
                 )}
               </motion.button>
             </div>

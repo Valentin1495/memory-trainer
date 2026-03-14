@@ -19,12 +19,16 @@ export function ReviewModal({ isOpen, words, wordDurationMs, difficulty, onClose
   const [showWord, setShowWord] = useState(false);
   const [started, setStarted] = useState(false);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   const variants = WORD_VARIANTS[difficulty];
   const isHard = variants.textOnly;
   const hardWordControls = useAnimationControls();
 
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) return;
     setCurrentIndex(0);
@@ -39,6 +43,7 @@ export function ReviewModal({ isOpen, words, wordDurationMs, difficulty, onClose
     }, REVIEW_MODAL_START_DELAY_MS);
     return () => clearTimeout(id);
   }, [isOpen, isHard, hardWordControls]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!isOpen || !started || isHard) return;

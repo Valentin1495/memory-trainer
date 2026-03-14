@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../hooks/useGame';
 import { useGameStore } from '../store/gameStore';
+import { useSettingsStore } from '../store/settingsStore';
+import { purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
 import { DIFFICULTY_CONFIG } from '../types';
 import type { GameMode, Difficulty } from '../types';
 
@@ -38,12 +40,15 @@ export function Home() {
   const navigate = useNavigate();
   const { isLoading, category, nickname, setNickname, setMode, handleStartMemorize } = useGame();
   const { difficulty, setDifficulty } = useGameStore();
+  const { adRemoved } = useSettingsStore();
   const [confirmedNickname, setConfirmedNickname] = useState(nickname);
   const [draftNickname, setDraftNickname] = useState(nickname);
   const [isEditingNickname, setIsEditingNickname] = useState(!nickname);
   const [nicknameError, setNicknameError] = useState(false);
   const [selectedMode, setSelectedMode] = useState<GameMode>('basic');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(difficulty);
+  const [iapLoading, setIapLoading] = useState(false);
+  const [showIapSheet, setShowIapSheet] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleStartEdit = () => {
@@ -87,6 +92,24 @@ export function Home() {
     navigate('/game');
   };
 
+  const handlePurchaseNoAds = useCallback(async () => {
+    setIapLoading(true);
+    await purchaseNoAds();
+    setIapLoading(false);
+    setShowIapSheet(false);
+  }, []);
+
+  const handleRestorePurchases = useCallback(async () => {
+    setIapLoading(true);
+    try {
+      await restorePurchases();
+    } catch {
+      // 취소 또는 실패 — 시트 유지
+    } finally {
+      setIapLoading(false);
+    }
+  }, []);
+
   const config = DIFFICULTY_CONFIG[selectedDifficulty];
 
   if (isLoading) {
@@ -103,15 +126,70 @@ export function Home() {
 
   return (
     <div className="h-screen overflow-y-auto safe-top-home safe-bottom">
+
+      {/* 광고 제거 바텀 시트 */}
+      <AnimatePresence>
+        {showIapSheet && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-30 bg-black/40"
+              onClick={() => setShowIapSheet(false)}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-40 bg-white rounded-t-3xl px-6 pt-5 pb-8 safe-bottom"
+            >
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+              <h3 className="text-lg font-bold text-gray-800 mb-1">광고 없이 즐기기</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                전면 광고를 영구 제거합니다.{getNoAdsPrice() ? ` (${getNoAdsPrice()})` : ''}
+              </p>
+              <button
+                onClick={handlePurchaseNoAds}
+                disabled={iapLoading}
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl shadow-lg disabled:opacity-60 mb-3"
+              >
+                {iapLoading ? '처리 중...' : '구매하기'}
+              </button>
+              <button
+                onClick={handleRestorePurchases}
+                disabled={iapLoading}
+                className="w-full py-3 text-gray-400 text-sm font-medium disabled:opacity-50"
+              >
+                이미 구매했어요 (복원)
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <div className="min-h-full flex flex-col items-center justify-center px-4 py-8">
         <div className="flex flex-col items-center w-full max-w-sm">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-6"
+            className="relative w-full text-center mb-6"
           >
             <h1 className="text-4xl font-bold text-white mb-2">기억력 챌린지</h1>
             <p className="text-white/70">하루 1분, 두뇌 트레이닝</p>
+            {!adRemoved && (
+              <button
+                onClick={() => setShowIapSheet(true)}
+                className="absolute right-0 top-0 w-9 h-9 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                aria-label="설정"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            )}
           </motion.div>
 
           <motion.div
@@ -319,6 +397,7 @@ export function Home() {
             >
               리더보드 보기
             </button>
+
           </motion.div>
         </div>
       </div>
