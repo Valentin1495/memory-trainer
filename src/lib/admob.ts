@@ -49,24 +49,26 @@ export async function showInterstitialAd(): Promise<void> {
   if (useSettingsStore.getState().adRemoved) return;
   interstitialReady = false;
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>(async (resolve) => {
     let resolved = false;
     const done = () => {
-      if (!resolved) {
-        resolved = true;
-        resolve();
-      }
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      dismissedHandle.remove();
+      failedHandle.remove();
+      resolve();
     };
 
-    AdMob.addListener(InterstitialAdPluginEvents.Dismissed, done);
-    AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, done);
+    const [dismissedHandle, failedHandle] = await Promise.all([
+      AdMob.addListener(InterstitialAdPluginEvents.Dismissed, done),
+      AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, done),
+    ]);
+
     // 안전망: 60초 후에도 닫히지 않으면 강제 진행
     const timeout = setTimeout(done, 60_000);
 
-    AdMob.showInterstitial().catch(() => {
-      clearTimeout(timeout);
-      done();
-    });
+    AdMob.showInterstitial().catch(done);
   });
 
   // 다음 광고 사전 로딩

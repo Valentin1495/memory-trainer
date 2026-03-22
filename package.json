@@ -9,11 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "postinstall": "patch-package",
-    "cap:sync:dev": "CAP_SERVER_URL=http://192.168.123.107:5173 npx cap sync",
+    "cap:sync:dev": "npx cap sync",
     "cap:sync": "npm run build && npx cap sync",
-    "cap:ios:dev": "CAP_SERVER_URL=http://192.168.123.107:5173 npx cap sync ios && npx cap open ios",
+    "cap:ios:dev": "npx cap sync ios && npx cap open ios",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
-    "cap:android:dev": "CAP_SERVER_URL=http://192.168.123.107:5173 npx cap sync android && npx cap open android",
+    "cap:android:dev": "npx cap sync android && npx cap open android",
     "cap:android": "npm run build && npx cap sync android && npx cap open android"
   },
   "dependencies": {

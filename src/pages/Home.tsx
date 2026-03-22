@@ -39,13 +39,13 @@ const DIFFICULTY_META = {
 export function Home() {
   const navigate = useNavigate();
   const { isLoading, category, nickname, setNickname, setMode, handleStartMemorize } = useGame();
-  const { difficulty, setDifficulty } = useGameStore();
+  const { difficulty, setDifficulty, mode: storedMode } = useGameStore();
   const { adRemoved } = useSettingsStore();
   const [confirmedNickname, setConfirmedNickname] = useState(nickname);
   const [draftNickname, setDraftNickname] = useState(nickname);
   const [isEditingNickname, setIsEditingNickname] = useState(!nickname);
   const [nicknameError, setNicknameError] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<GameMode>('basic');
+  const [selectedMode, setSelectedMode] = useState<GameMode>(storedMode);
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(difficulty);
   const [iapLoading, setIapLoading] = useState(false);
   const [showIapSheet, setShowIapSheet] = useState(false);
@@ -67,6 +67,7 @@ export function Home() {
     const trimmed = draftNickname.trim();
     if (!trimmed) return;
     setConfirmedNickname(trimmed);
+    setNickname(trimmed);
     setIsEditingNickname(false);
     setNicknameError(false);
   };
@@ -201,7 +202,7 @@ export function Home() {
             {/* 오늘의 카테고리 */}
             <div className="text-center mb-5">
               <span className="inline-block px-4 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium mb-2">
-                오늘의 카테고리
+                오늘의 카테고리는
               </span>
               <h2 className="text-2xl font-bold text-gray-800">{category?.name || '로딩 중...'}</h2>
             </div>
@@ -284,7 +285,7 @@ export function Home() {
                 {(['basic', 'reverse'] as GameMode[]).map((m) => (
                   <button
                     key={m}
-                    onClick={() => setSelectedMode(m)}
+                    onClick={() => { setSelectedMode(m); setMode(m); }}
                     className={`p-3 rounded-xl border-2 transition-all text-left ${selectedMode === m
                       ? 'border-purple-500 bg-purple-50'
                       : 'border-gray-200 hover:border-purple-300'

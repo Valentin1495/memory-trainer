@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { GameMode, GamePhase, Word, DailyCategory, Difficulty } from '../types';
 import { DIFFICULTY_CONFIG } from '../types';
 
@@ -58,7 +59,9 @@ function assignWords(
   return { shownWords, allWords };
 }
 
-export const useGameStore = create<GameStore>((set, get) => ({
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set, get) => ({
   phase: 'home',
   mode: 'basic',
   difficulty: 'medium',
@@ -240,4 +243,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   getDifficultyConfig: () => {
     return DIFFICULTY_CONFIG[get().difficulty];
   },
-}));
+    }),
+    {
+      name: 'mc-game-prefs',
+      // 모드·난이도·닉네임만 영구 저장, 게임 진행 상태는 제외
+      partialize: (state) => ({
+        mode: state.mode,
+        difficulty: state.difficulty,
+        nickname: state.nickname,
+      }),
+    }
+  )
+);
