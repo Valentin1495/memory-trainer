@@ -100,7 +100,7 @@ export function getRecommendedTraining(
 }
 
 export function calculateBaselineDifficulty(
-  easyScore: number,
+  _easyScore: number,
   mediumScore: number,
   hardScore: number
 ): Difficulty {

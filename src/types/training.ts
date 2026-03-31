@@ -11,6 +11,7 @@ export interface UserProfile {
   lastModuleId: string;
   onboardingComplete: boolean;
   diagnosisComplete: boolean;
+  diagnosisDeferred?: boolean;
   baselineScore: number;
   createdAt: string;
 }

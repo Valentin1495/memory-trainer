@@ -65,6 +65,7 @@ export function Onboarding() {
       lastModuleId: 'word-memory',
       onboardingComplete: true,
       diagnosisComplete: false,
+      diagnosisDeferred: false,
       baselineScore: 0,
       createdAt: new Date().toISOString(),
     };

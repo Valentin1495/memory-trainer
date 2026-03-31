@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDiagnosis } from '../hooks/useDiagnosis';
 import { useGameStore } from '../store/gameStore';
+import { useUserProfileStore } from '../store/userProfileStore';
 import { useGame } from '../hooks/useGame';
 import { getTrainingModule } from '../training/registry';
 import type { TrainingSessionResult } from '../types/training';
@@ -18,6 +19,7 @@ const STEP_LABELS = {
 
 export function Diagnosis() {
   const navigate = useNavigate();
+  const deferDiagnosis = useUserProfileStore(s => s.deferDiagnosis);
   const { setDifficulty, setMode, startGame } = useGameStore();
   const { isLoading } = useGame();
   const {
@@ -55,6 +57,11 @@ export function Diagnosis() {
 
   const onModuleComplete = (result: TrainingSessionResult) => {
     handleStepComplete(result);
+  };
+
+  const handleLater = () => {
+    deferDiagnosis();
+    navigate('/', { replace: true });
   };
 
   if (step === 'intro') {
@@ -105,7 +112,7 @@ export function Diagnosis() {
             진단 시작
           </motion.button>
           <button
-            onClick={() => navigate('/')}
+            onClick={handleLater}
             className="w-full mt-3 py-3 text-white/50 text-sm"
           >
             나중에 하기

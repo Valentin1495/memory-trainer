@@ -13,6 +13,7 @@ interface UserProfileStore {
   updateGoal: (goal: TrainingGoal) => void;
   updateDailyGoal: (minutes: number) => void;
   completeDiagnosis: (baselineScore: number, difficulty: Difficulty) => void;
+  deferDiagnosis: () => void;
   resetProfile: () => void;
 }
 
@@ -26,7 +27,7 @@ export const useUserProfileStore = create<UserProfileStore>()(
       setProfile: (profile) => set({
         profile,
         isOnboarded: profile.onboardingComplete,
-        isDiagnosed: profile.diagnosisComplete,
+        isDiagnosed: profile.diagnosisComplete || profile.diagnosisDeferred === true,
       }),
 
       updateDifficulty: (difficulty) => {
@@ -59,10 +60,23 @@ export const useUserProfileStore = create<UserProfileStore>()(
         const updated = {
           ...profile,
           diagnosisComplete: true,
+          diagnosisDeferred: false,
           baselineScore,
           currentDifficulty: difficulty,
         };
         set({ profile: updated, isDiagnosed: true });
+      },
+
+      deferDiagnosis: () => {
+        const { profile } = get();
+        if (!profile) return;
+        set({
+          profile: {
+            ...profile,
+            diagnosisDeferred: true,
+          },
+          isDiagnosed: true,
+        });
       },
 
       resetProfile: () => set({ profile: null, isOnboarded: false, isDiagnosed: false }),

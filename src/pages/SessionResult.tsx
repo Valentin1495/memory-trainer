@@ -22,7 +22,7 @@ export function SessionResult() {
   const result = location.state?.result as TrainingSessionResult | undefined;
 
   const store = useGameStore();
-  const { profile, updateDifficulty } = useUserProfileStore();
+  const { updateDifficulty } = useUserProfileStore();
   const recommendation = useRecommendation();
   const { submitScore } = useLeaderboard({ period: 'daily' });
 

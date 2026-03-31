@@ -18,6 +18,7 @@ import { initIAP } from './lib/iap';
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const isOnboarded = useUserProfileStore(s => s.isOnboarded);
   const isDiagnosed = useUserProfileStore(s => s.isDiagnosed);
+  const diagnosisDeferred = useUserProfileStore(s => s.profile?.diagnosisDeferred === true);
   const location = useLocation();
 
   const isPublicPath =
@@ -29,7 +30,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   if (!isOnboarded && !isPublicPath) {
     return <Navigate to="/onboarding" replace />;
   }
-  if (isOnboarded && !isDiagnosed && location.pathname === '/') {
+  if (isOnboarded && !isDiagnosed && !diagnosisDeferred && location.pathname === '/') {
     return <Navigate to="/diagnosis" replace />;
   }
   return <>{children}</>;
