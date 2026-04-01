@@ -52,7 +52,10 @@ export function Report() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <h1 className="text-xl font-bold text-white">주간 리포트</h1>
+          <div>
+            <h1 className="text-xl font-bold text-white">최근 7일 훈련 분석</h1>
+            <p className="text-xs text-white/60">훈련 빈도, 정확도 추이, 약점 단어를 한눈에 확인하세요.</p>
+          </div>
         </div>
 
         {isEmpty ? (
@@ -112,7 +115,8 @@ export function Report() {
               transition={{ delay: 0.05 }}
               className="bg-white rounded-2xl p-5"
             >
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">훈련 빈도</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">훈련 빈도</p>
+              <p className="mt-1 mb-4 text-xs text-gray-400">막대를 누르면 날짜별 훈련 횟수와 평균 점수를 확인할 수 있어요.</p>
               <WeeklyBarChart
                 counts={stats.dailyCounts}
                 labels={dayLabels}
@@ -127,7 +131,8 @@ export function Report() {
               transition={{ delay: 0.1 }}
               className="bg-white rounded-2xl p-5"
             >
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">정확도 추이</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">정확도 추이</p>
+              <p className="mt-1 mb-4 text-xs text-gray-400">날짜별 정확도 변화로 최근 집중도 흐름을 살펴보세요.</p>
               <AccuracyTrend accuracies={dailyAccuracies} labels={dayLabels} />
             </motion.div>
 

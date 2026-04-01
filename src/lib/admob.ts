@@ -15,6 +15,26 @@ function getInterstitialAdId(): string {
 
 let interstitialReady = false;
 let loadingInterstitial = false;
+let initializingAdMob = false;
+
+async function ensureTrackingAuthorization(): Promise<void> {
+  if (Capacitor.getPlatform() !== 'ios') return;
+
+  try {
+    const trackingStatus = await AdMob.trackingAuthorizationStatus();
+
+    if (trackingStatus.status === 'notDetermined') {
+      await AdMob.requestTrackingAuthorization();
+      const updatedStatus = await AdMob.trackingAuthorizationStatus();
+      console.info('[AdMob] ATT status after prompt:', updatedStatus.status);
+      return;
+    }
+
+    console.info('[AdMob] ATT status before init:', trackingStatus.status);
+  } catch (e) {
+    console.warn('[AdMob] tracking authorization check failed', e);
+  }
+}
 
 async function loadInterstitial(): Promise<void> {
   if (!isNative() || loadingInterstitial) return;
@@ -31,16 +51,16 @@ async function loadInterstitial(): Promise<void> {
 }
 
 export async function initAdMob(): Promise<void> {
-  if (!isNative()) return;
+  if (!isNative() || initializingAdMob) return;
+  initializingAdMob = true;
   try {
+    await ensureTrackingAuthorization();
     await AdMob.initialize();
-    // iOS 14+ ATT 권한 요청
-    if (Capacitor.getPlatform() === 'ios') {
-      await AdMob.requestTrackingAuthorization().catch(() => {});
-    }
     await loadInterstitial();
   } catch (e) {
     console.warn('[AdMob] initialize failed', e);
+  } finally {
+    initializingAdMob = false;
   }
 }
 

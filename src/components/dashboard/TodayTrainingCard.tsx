@@ -51,7 +51,7 @@ export function TodayTrainingCard({ recommendation, todayCount, onStart }: Today
         whileTap={{ scale: 0.98 }}
         className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-md"
       >
-        {todayCount === 0 ? '훈련 시작' : '한 번 더 하기'}
+        {todayCount === 0 ? '추천 훈련 시작' : '추천 훈련 이어서 하기'}
       </motion.button>
     </motion.div>
   );

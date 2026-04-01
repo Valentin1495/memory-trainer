@@ -100,13 +100,34 @@ export function getRecommendedTraining(
 }
 
 export function calculateBaselineDifficulty(
-  _easyScore: number,
+  easyScore: number,
   mediumScore: number,
   hardScore: number
 ): Difficulty {
-  if (hardScore >= 800) return 'hard';
-  if (mediumScore >= 600) return 'medium';
+  if (hardScore >= 780) return 'hard';
+  if (mediumScore >= 620) return 'medium';
+  if (easyScore >= 380) return 'easy';
   return 'easy';
+}
+
+export function calculateDiagnosisStepScore(
+  difficulty: Difficulty,
+  accuracy: number,
+  timeMs: number,
+  wrongCount: number,
+  reviewCount: number
+): number {
+  const difficultyBonus = difficulty === 'easy' ? 0 : difficulty === 'medium' ? 110 : 220;
+  const completionBonus = accuracy >= 1 ? 120 : accuracy >= 0.8 ? 80 : accuracy >= 0.6 ? 40 : 0;
+  const accuracyPoints = Math.round(accuracy * 700);
+  const timePenalty = Math.min(120, Math.floor(timeMs / 1000) * 4);
+  const wrongPenalty = wrongCount * 35;
+  const reviewPenalty = reviewCount * 50;
+
+  return Math.max(
+    0,
+    accuracyPoints + difficultyBonus + completionBonus - timePenalty - wrongPenalty - reviewPenalty
+  );
 }
 
 export function getWeakWords(sessions: SessionRecord[], limit = 5): string[] {

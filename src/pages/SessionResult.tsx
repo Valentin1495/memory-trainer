@@ -116,7 +116,7 @@ export function SessionResult() {
                 <span>{isSuccess !== false ? '✅' : '❌'}</span>
                 <span>{isSuccess !== false ? '성공!' : '실패'}</span>
               </div>
-              <p className="text-xs text-gray-400 mb-1">최종 점수</p>
+              <p className="text-xs text-gray-400 mb-1">이번 훈련 결과</p>
               <p className="text-5xl font-bold text-purple-600">{score.toLocaleString()}</p>
               <p className="text-xs text-gray-400 mt-1">정확도 {Math.round(accuracy * 100)}%</p>
             </div>
@@ -129,7 +129,7 @@ export function SessionResult() {
             {/* 통계 */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-gray-400 mb-1">모드</p>
+                <p className="text-xs text-gray-400 mb-1">훈련 방식</p>
                 <p className="text-sm font-semibold text-gray-800">
                   {mode === 'basic' ? '기본' : '리버스'}
                   {mode === 'reverse' && (
@@ -224,7 +224,7 @@ export function SessionResult() {
                 whileTap={{ scale: adLoading ? 1 : 0.98 }}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl shadow-lg disabled:opacity-60"
               >
-                {adLoading ? '잠시만요...' : '다시 훈련하기'}
+                {adLoading ? '잠시만요...' : '같은 훈련 다시 하기'}
               </motion.button>
               <div className="grid grid-cols-2 gap-2.5">
                 <button

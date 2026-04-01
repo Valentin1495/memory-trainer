@@ -74,7 +74,7 @@ export function Diagnosis() {
         >
           <div className="text-center mb-8">
             <p className="text-5xl mb-4">🔬</p>
-            <h1 className="text-2xl font-bold text-white mb-3">초기 진단 테스트</h1>
+            <h1 className="text-2xl font-bold text-white mb-3">개인 맞춤 시작 평가</h1>
             <p className="text-white/70 text-sm leading-relaxed">
               현재 기억력 수준을 측정하여<br />
               맞춤 훈련 프로그램을 설계합니다.
@@ -109,7 +109,7 @@ export function Diagnosis() {
             whileTap={{ scale: 0.98 }}
             className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
           >
-            진단 시작
+            시작 평가 진행
           </motion.button>
           <button
             onClick={handleLater}
@@ -117,6 +117,9 @@ export function Diagnosis() {
           >
             나중에 하기
           </button>
+          <p className="mt-2 text-center text-xs text-white/40">
+            평가를 완료하면 더 정확한 난이도와 추천 훈련을 받을 수 있어요.
+          </p>
         </motion.div>
       </div>
     );

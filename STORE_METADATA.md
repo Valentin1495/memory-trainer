@@ -112,7 +112,7 @@ Easy → Medium → Hard 순서로 현재 수준을 정확히 측정하고,
 ## Support Contact
 
 - Support email: `valentink1495@gmail.com`
-- Privacy policy URL: `https://www.notion.so/Memory-Challenge-31997facb1b48066a957e0353ad9fc60?source=copy_link`
+- Privacy policy URL: `https://www.notion.so/33597facb1b4804b9674cde1c18c91a1?source=copy_link`
 
 ---
 

@@ -83,6 +83,7 @@ export function WordMemoryModule({ difficulty, mode = 'basic', onComplete, onExi
   const targetCount = mode === 'basic' ? shownWords.length : config.decoyCount;
   const progress = targetCount > 0 ? (correctSelections.length / targetCount) * 100 : 0;
   const livesRemaining = config.maxLives - wrongCount;
+  const modeLabel = mode === 'basic' ? '지나간 단어 찾기' : '지나가지 않은 단어 찾기';
 
   return (
     <div className="min-h-screen flex flex-col safe-top safe-bottom">
@@ -95,13 +96,29 @@ export function WordMemoryModule({ difficulty, mode = 'basic', onComplete, onExi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>
-        <div className="text-white/70 text-sm font-medium">{category.name}</div>
+        <div className="w-24" />
         {phase === 'choose' ? (
           <Timer formattedTime={timer.formattedTime} isRunning={timer.isRunning} />
         ) : (
           <div className="w-20" />
         )}
       </header>
+
+      <div className="px-4 pb-2">
+        <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                Current Topic
+              </p>
+              <p className="mt-1 text-base font-semibold text-white">{category.name}</p>
+            </div>
+            <div className="rounded-full bg-white/12 px-3 py-1.5 text-xs font-medium text-white/80">
+              {modeLabel}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <main className="flex-1 flex flex-col">
         {phase === 'memorize' && (
@@ -123,7 +140,7 @@ export function WordMemoryModule({ difficulty, mode = 'basic', onComplete, onExi
               <p className="text-4xl mb-3">🧠</p>
               <h2 className="text-2xl font-bold text-white mb-2">준비됐나요?</h2>
               <p className="text-white/70 text-sm">
-                {mode === 'basic' ? '기억나는 단어를 모두 선택하세요' : '보지 않았던 단어를 선택하세요'}
+                {mode === 'basic' ? '기억나는 단어를 모두 선택하세요' : '보지 못한 단어를 선택하세요'}
               </p>
             </div>
             <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
@@ -165,7 +182,7 @@ export function WordMemoryModule({ difficulty, mode = 'basic', onComplete, onExi
             <div className="px-4 py-2">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-white/80 text-sm">
-                  {mode === 'basic' ? '기억나는 단어를 모두 선택하세요' : '보지 않았던 단어를 선택하세요'}
+                  {mode === 'basic' ? '기억나는 단어를 모두 선택하세요' : '보지 못한 단어를 선택하세요'}
                 </span>
                 <span className="text-white/80 text-sm">{correctSelections.length} / {targetCount}</span>
               </div>

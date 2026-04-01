@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useHistoryStore } from '../store/historyStore';
 import { useUserProfileStore } from '../store/userProfileStore';
-import { calculateBaselineDifficulty } from '../lib/recommendation';
+import { calculateBaselineDifficulty, calculateDiagnosisStepScore } from '../lib/recommendation';
 import type { Difficulty } from '../types';
 import type { TrainingSessionResult } from '../types/training';
 
@@ -37,17 +37,29 @@ export function useDiagnosis() {
 
   const handleStepComplete = useCallback((result: TrainingSessionResult) => {
     const difficulty = result.difficulty as Difficulty;
-    const newResults = { ...results, [difficulty]: result.score };
+    const diagnosisScore = calculateDiagnosisStepScore(
+      difficulty,
+      result.accuracy,
+      result.timeMs,
+      Number(result.metadata.wrongCount ?? 0),
+      Number(result.metadata.reviewCount ?? 0)
+    );
+    const newResults = { ...results, [difficulty]: diagnosisScore };
     setResults(newResults);
 
     addSession({
       moduleId: result.moduleId,
-      score: result.score,
+      score: diagnosisScore,
       accuracy: result.accuracy,
       timeMs: result.timeMs,
       difficulty: result.difficulty,
       completedAt: result.completedAt,
-      metadata: { ...result.metadata, isDiagnosis: true },
+      metadata: {
+        ...result.metadata,
+        isDiagnosis: true,
+        rawTrainingScore: result.score,
+        diagnosisScore,
+      },
     });
 
     if (difficulty === 'easy') {

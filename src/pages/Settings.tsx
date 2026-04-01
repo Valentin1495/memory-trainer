@@ -8,6 +8,7 @@ import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
 import type { TrainingGoal } from '../types/training';
+import type { GameMode } from '../types';
 
 const GOAL_LABELS: Record<TrainingGoal, string> = {
   focus: '집중력 향상',
@@ -16,12 +17,16 @@ const GOAL_LABELS: Record<TrainingGoal, string> = {
 };
 
 const DAILY_GOAL_OPTIONS = [1, 3, 5];
+const MODE_LABELS: Record<GameMode, string> = {
+  basic: '기억한 단어 선택',
+  reverse: '보지 못한 단어 선택',
+};
 
 export function Settings() {
   const navigate = useNavigate();
   const { profile, updateGoal, updateDailyGoal, updateDifficulty, resetProfile } = useUserProfileStore();
   const { clearHistory } = useHistoryStore();
-  const { setNickname } = useGameStore();
+  const { mode, setMode, setNickname } = useGameStore();
   const { adRemoved } = useSettingsStore();
 
   const [iapLoading, setIapLoading] = useState(false);
@@ -112,6 +117,31 @@ export function Settings() {
               ) : (
                 <button onClick={handleStartEditNickname} className="ml-3 text-sm text-purple-600 shrink-0">변경</button>
               )}
+            </div>
+
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">기본 훈련 방식</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(['basic', 'reverse'] as const).map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={`rounded-xl border-2 px-3 py-3 text-left transition-all ${
+                      mode === m
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-200 text-gray-500 hover:border-purple-300'
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">{MODE_LABELS[m]}</p>
+                    <p className="mt-1 text-xs opacity-75">
+                      {m === 'basic' ? '방금 본 단어를 고릅니다.' : '보지 못한 단어를 골라냅니다.'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                시작 평가는 항상 기본 방식으로 진행됩니다.
+              </p>
             </div>
           </motion.div>
 

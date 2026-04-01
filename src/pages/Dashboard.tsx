@@ -32,11 +32,12 @@ export function Dashboard() {
   const getStreakDays = useHistoryStore(s => s.getStreakDays);
   const sessions = useHistoryStore(s => s.sessions);
   const recommendation = useRecommendation();
-  const { setDifficulty, setMode, startGame } = useGameStore();
+  const { setDifficulty, startGame } = useGameStore();
   const { adRemoved } = useSettingsStore();
   const { isLoading, category } = useGame();
   const [showIapSheet, setShowIapSheet] = useState(false);
   const [iapLoading, setIapLoading] = useState(false);
+  const showDiagnosisBanner = profile?.diagnosisDeferred === true && !profile?.diagnosisComplete;
 
   const todaySessions = getTodaySessions();
   const streak = getStreakDays();
@@ -52,10 +53,9 @@ export function Dashboard() {
 
   const handleStartTraining = useCallback(() => {
     setDifficulty(recommendation.difficulty);
-    setMode('basic');
     startGame();
     navigate(`/training/${recommendation.moduleId}`);
-  }, [recommendation, setDifficulty, setMode, startGame, navigate]);
+  }, [recommendation, setDifficulty, startGame, navigate]);
 
   const handlePurchaseNoAds = async () => {
     setIapLoading(true);
@@ -160,6 +160,33 @@ export function Dashboard() {
         )}
 
         {/* 오늘의 추천 훈련 카드 */}
+        {showDiagnosisBanner && (
+          <motion.button
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            onClick={() => navigate('/diagnosis')}
+            className="mb-4 w-full rounded-2xl border border-amber-200/30 bg-gradient-to-r from-amber-400/20 to-orange-400/20 px-4 py-4 text-left shadow-lg shadow-black/10"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold tracking-[0.2em] text-amber-100/80">
+                  DIAGNOSIS
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  초기 평가를 완료하고 더 정확한 추천을 받아보세요
+                </p>
+                <p className="mt-1 text-xs text-white/70">
+                  지금 진단하면 훈련 난이도와 시작 기준이 더 잘 맞춰집니다.
+                </p>
+              </div>
+              <div className="shrink-0 rounded-full bg-white/20 px-3 py-2 text-xs font-bold text-white">
+                진단하기
+              </div>
+            </div>
+          </motion.button>
+        )}
+
         <div className="mb-5">
           <TodayTrainingCard
             recommendation={recommendation}
@@ -168,26 +195,17 @@ export function Dashboard() {
           />
         </div>
 
-        {/* 이번 주 훈련 현황 */}
+        {/* 최근 7일 훈련 현황 */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="bg-white/10 rounded-2xl p-5 mb-4"
         >
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-white font-semibold text-sm">이번 주 훈련</p>
-            <button
-              onClick={() => navigate('/report')}
-              className="text-white/60 text-xs hover:text-white transition-colors"
-            >
-              전체 리포트 →
-            </button>
+          <div className="mb-4">
+            <p className="text-white font-semibold text-sm">최근 7일 훈련 기록</p>
           </div>
           <MiniBarChart counts={dailyCounts} labels={getDayLabels()} />
-          <p className="text-white/50 text-xs text-center mt-3">
-            이번 주 {dailyCounts.reduce((a, b) => a + b, 0)}회 훈련
-          </p>
         </motion.div>
 
         {/* 하단 메뉴 */}

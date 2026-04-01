@@ -177,7 +177,7 @@ export function Home() {
             animate={{ opacity: 1, y: 0 }}
             className="relative w-full text-center mb-6"
           >
-            <h1 className="text-4xl font-bold text-white mb-2">기억력 챌린지</h1>
+            <h1 className="text-4xl font-bold text-white mb-2">기억력 트레이너</h1>
             <p className="text-white/70">하루 1분, 두뇌 트레이닝</p>
             {!adRemoved && (
               <button

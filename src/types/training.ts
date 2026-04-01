@@ -31,6 +31,8 @@ export interface SessionRecord {
     categoryName?: string;
     mode?: string;
     isDiagnosis?: boolean;
+    rawTrainingScore?: number;
+    diagnosisScore?: number;
   };
 }
 
