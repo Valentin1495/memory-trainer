@@ -16,6 +16,10 @@ function getInterstitialAdId(): string {
 let interstitialReady = false;
 let loadingInterstitial = false;
 let initializingAdMob = false;
+const AD_FREQUENCY = 3;
+let sessionsSinceLastAd = 0;
+const AD_COOLDOWN_MS = 3 * 60 * 1000; // 3분
+let lastAdShownAt: number | null = null;
 
 async function ensureTrackingAuthorization(): Promise<void> {
   if (Capacitor.getPlatform() !== 'ios') return;
@@ -91,6 +95,18 @@ export async function showInterstitialAd(): Promise<void> {
     AdMob.showInterstitial().catch(done);
   });
 
+  lastAdShownAt = Date.now();
+
   // 다음 광고 사전 로딩
   loadInterstitial();
+}
+
+export async function showInterstitialAdThrottled(): Promise<void> {
+  sessionsSinceLastAd++;
+  if (sessionsSinceLastAd < AD_FREQUENCY) return;
+
+  if (lastAdShownAt !== null && Date.now() - lastAdShownAt < AD_COOLDOWN_MS) return;
+
+  sessionsSinceLastAd = 0;
+  await showInterstitialAd();
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SessionRecord, WeeklyStats } from '../types/training';
+import { TRAINING_REGISTRY } from '../training/registry';
 
 const MAX_SESSIONS = 500;
 const MAX_DAYS = 90;
@@ -41,7 +42,6 @@ interface HistoryStore {
   addSession: (record: Omit<SessionRecord, 'id'>) => SessionRecord;
   getRecentSessions: (days: number) => SessionRecord[];
   getTodaySessions: () => SessionRecord[];
-  getWeakWords: (days?: number) => string[];
   getStreakDays: () => number;
   getWeeklyStats: () => WeeklyStats;
   clearHistory: () => void;
@@ -70,21 +70,6 @@ export const useHistoryStore = create<HistoryStore>()(
         return get().sessions.filter(s => s.completedAt.slice(0, 10) === today);
       },
 
-      getWeakWords: (days = 30) => {
-        const cutoff = dateStrNDaysAgo(days);
-        const recent = get().sessions.filter(s => s.completedAt.slice(0, 10) >= cutoff);
-        const missedCount: Record<string, number> = {};
-        recent.forEach(s => {
-          (s.metadata.missedWords ?? []).forEach((w) => {
-            missedCount[w] = (missedCount[w] ?? 0) + 1;
-          });
-        });
-        return Object.entries(missedCount)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([word]) => word);
-      },
-
       getStreakDays: () => {
         const sessions = get().sessions;
         if (sessions.length === 0) return 0;
@@ -110,6 +95,7 @@ export const useHistoryStore = create<HistoryStore>()(
         const today = new Date();
         const dailyCounts: number[] = [];
         const dailyAvgScores: (number | null)[] = [];
+        const dailyAccuracies: (number | null)[] = [];
 
         for (let i = 6; i >= 0; i--) {
           const d = new Date(today);
@@ -119,8 +105,11 @@ export const useHistoryStore = create<HistoryStore>()(
           dailyCounts.push(daySessions.length);
           if (daySessions.length > 0) {
             dailyAvgScores.push(Math.round(daySessions.reduce((sum, s) => sum + s.score, 0) / daySessions.length));
+            const avgAcc = daySessions.reduce((sum, s) => sum + s.accuracy, 0) / daySessions.length;
+            dailyAccuracies.push(Math.round(avgAcc * 100) / 100);
           } else {
             dailyAvgScores.push(null);
+            dailyAccuracies.push(null);
           }
         }
 
@@ -137,15 +126,34 @@ export const useHistoryStore = create<HistoryStore>()(
           ? Math.round((recent7.reduce((sum, s) => sum + s.accuracy, 0) / totalSessions) * 100) / 100
           : 0;
 
+        const moduleStats = TRAINING_REGISTRY.map(def => {
+          const modSessions = recent7.filter(s => s.moduleId === def.id);
+          const count = modSessions.length;
+          return {
+            moduleId: def.id,
+            name: def.name,
+            icon: def.icon,
+            sessions: count,
+            avgScore: count > 0
+              ? Math.round(modSessions.reduce((sum, s) => sum + s.score, 0) / count)
+              : 0,
+            avgAccuracy: count > 0
+              ? Math.round((modSessions.reduce((sum, s) => sum + s.accuracy, 0) / count) * 100) / 100
+              : 0,
+          };
+        }).filter(m => m.sessions > 0)
+          .sort((a, b) => b.sessions - a.sessions);
+
         return {
           weekStart: weekStartStr,
           totalSessions,
           avgScore,
           avgAccuracy,
-          weakWords: get().getWeakWords(7),
           streakDays: get().getStreakDays(),
           dailyCounts,
           dailyAvgScores,
+          dailyAccuracies,
+          moduleStats,
         };
       },
 

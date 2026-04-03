@@ -14,6 +14,7 @@ interface UserProfileStore {
   updateDailyGoal: (minutes: number) => void;
   completeDiagnosis: (baselineScore: number, difficulty: Difficulty) => void;
   deferDiagnosis: () => void;
+  resetDiagnosis: () => void;
   resetProfile: () => void;
 }
 
@@ -76,6 +77,20 @@ export const useUserProfileStore = create<UserProfileStore>()(
             diagnosisDeferred: true,
           },
           isDiagnosed: true,
+        });
+      },
+
+      resetDiagnosis: () => {
+        const { profile } = get();
+        if (!profile) return;
+        set({
+          profile: {
+            ...profile,
+            diagnosisComplete: false,
+            diagnosisDeferred: false,
+            baselineScore: 0,
+          },
+          isDiagnosed: false,
         });
       },
 

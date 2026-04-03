@@ -1,11 +1,12 @@
 import { useEffect, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useDiagnosis } from '../hooks/useDiagnosis';
 import { useGameStore } from '../store/gameStore';
 import { useUserProfileStore } from '../store/userProfileStore';
-import { useGame } from '../hooks/useGame';
 import { getTrainingModule } from '../training/registry';
+import { getUserLevelSummary } from '../lib/recommendation';
+import type { Difficulty } from '../types';
 import type { TrainingSessionResult } from '../types/training';
 
 const wordMemoryDef = getTrainingModule('word-memory');
@@ -17,43 +18,43 @@ const STEP_LABELS = {
   hard: { label: 'HARD', color: 'text-red-400', desc: '12개 단어 · 0.5초' },
 };
 
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  easy: '초급',
+  medium: '중급',
+  hard: '고급',
+};
+
+const DIFFICULTY_COLOR: Record<Difficulty, string> = {
+  easy: 'text-green-400',
+  medium: 'text-yellow-400',
+  hard: 'text-red-400',
+};
+
 export function Diagnosis() {
   const navigate = useNavigate();
   const deferDiagnosis = useUserProfileStore(s => s.deferDiagnosis);
+  const profileDifficulty = useUserProfileStore(s => s.profile?.currentDifficulty ?? 'easy');
+  const baselineScore = useUserProfileStore(s => s.profile?.baselineScore ?? 0);
   const { setDifficulty, setMode, startGame } = useGameStore();
-  const { isLoading } = useGame();
   const {
     step,
     currentDifficulty,
-    progress,
     completedSteps,
     totalSteps,
+    results,
     startDiagnosis,
     handleStepComplete,
-    handleStepExit,
   } = useDiagnosis();
 
-  // 스텝이 바뀔 때마다 게임 상태를 초기화하고 난이도 세팅
+  // 단계가 바뀔 때마다 난이도·모드 세팅 (startGame은 WordMemoryModule이 담당)
   useEffect(() => {
     if (currentDifficulty) {
       setDifficulty(currentDifficulty);
       setMode('basic');
-    }
-  }, [currentDifficulty, setDifficulty, setMode]);
-
-  useEffect(() => {
-    if (currentDifficulty && !isLoading) {
       startGame();
     }
-  // 카테고리 로딩 완료 시에만 startGame 호출
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDifficulty, isLoading]);
-
-  useEffect(() => {
-    if (step === 'complete') {
-      navigate('/');
-    }
-  }, [step, navigate]);
+  }, [currentDifficulty]);
 
   const onModuleComplete = (result: TrainingSessionResult) => {
     handleStepComplete(result);
@@ -63,6 +64,94 @@ export function Diagnosis() {
     deferDiagnosis();
     navigate('/', { replace: true });
   };
+
+  const handleCancelDiagnosis = () => {
+    deferDiagnosis();
+    navigate('/', { replace: true });
+  };
+
+  if (step === 'complete') {
+    const baseline = profileDifficulty;
+    const levelSummary = getUserLevelSummary(baselineScore);
+    const stepScores: { label: string; score: number; colorClass: string }[] = (
+      ['easy', 'medium', 'hard'] as Difficulty[]
+    ).map(d => ({
+      label: STEP_LABELS[d].label,
+      score: (results as Record<string, number>)[d] ?? 0,
+      colorClass: DIFFICULTY_COLOR[d],
+    }));
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 safe-top safe-bottom">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm"
+        >
+          <div className="text-center mb-8">
+            <motion.p
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1, type: 'spring', bounce: 0.5 }}
+              className="text-5xl mb-4"
+            >
+              🎉
+            </motion.p>
+            <h1 className="text-2xl font-bold text-white mb-2">평가 완료!</h1>
+            <p className="text-white/60 text-sm">3단계 진단이 끝났어요</p>
+          </div>
+
+          {/* 단계별 점수 */}
+          <div className="bg-white/10 rounded-2xl p-5 mb-5 space-y-3">
+            <p className="text-white font-semibold text-sm mb-1">단계별 결과</p>
+            {stepScores.map(({ label, score, colorClass }) => (
+              <div key={label} className="flex items-center justify-between">
+                <span className={`text-sm font-bold ${colorClass}`}>{label}</span>
+                <div className="flex-1 mx-4">
+                  <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-white/60 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, (score / 1000) * 100)}%` }}
+                      transition={{ duration: 0.6, delay: 0.3 }}
+                    />
+                  </div>
+                </div>
+                <span className="text-white/80 text-sm font-mono w-12 text-right">{score}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* 추천 시작 수준 */}
+          <div className="bg-white/15 rounded-2xl p-5 mb-7 text-center">
+            <p className="text-white/60 text-xs mb-1">추천 시작 수준</p>
+            <p className={`text-3xl font-black ${DIFFICULTY_COLOR[baseline]}`}>
+              {DIFFICULTY_LABEL[baseline]}
+            </p>
+            <p className="text-white/50 text-xs mt-1">
+              훈련을 거듭할수록 수준이 자동으로 조정돼요
+            </p>
+          </div>
+
+          <div className="bg-white/10 rounded-2xl p-5 mb-7">
+            <p className="text-white/60 text-xs mb-1">현재 진단 수준</p>
+            <p className="text-xl font-bold text-white">{levelSummary.label}</p>
+            <p className="mt-2 text-sm text-white/70">{levelSummary.description}</p>
+            <p className="mt-3 text-xs text-white/45">Baseline score {baselineScore}</p>
+          </div>
+
+          <motion.button
+            onClick={() => navigate('/')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
+          >
+            훈련 시작하기
+          </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (step === 'intro') {
     return (
@@ -125,49 +214,22 @@ export function Diagnosis() {
     );
   }
 
-  if (currentDifficulty && step !== 'complete') {
+  if (currentDifficulty) {
     const meta = STEP_LABELS[currentDifficulty];
     return (
       <div className="min-h-screen flex flex-col safe-top safe-bottom">
-        {/* 진단 진행률 헤더 */}
-        <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-white/70 text-xs">진단 테스트</span>
-            <span className={`text-xs font-bold ${meta.color}`}>
-              {completedSteps + 1} / {totalSteps} — {meta.label}
-            </span>
-          </div>
-          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-white rounded-full"
-              animate={{ width: `${progress + (100 / totalSteps) * 0.5}%` }}
-              transition={{ duration: 0.4 }}
-            />
-          </div>
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
+        <Suspense fallback={null}>
+          <WordMemoryModule
             key={currentDifficulty}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex-1"
-          >
-            <Suspense fallback={
-              <div className="flex-1 flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-              </div>
-            }>
-              <WordMemoryModule
-                difficulty={currentDifficulty}
-                mode="basic"
-                onComplete={onModuleComplete}
-                onExit={handleStepExit}
-              />
-            </Suspense>
-          </motion.div>
-        </AnimatePresence>
+            difficulty={currentDifficulty}
+            mode="basic"
+            isDiagnosis
+            diagnosisLabel={`진단 ${completedSteps + 1}/${totalSteps} — ${meta.label}`}
+            diagnosisColor={meta.color}
+            onComplete={onModuleComplete}
+            onExit={handleCancelDiagnosis}
+          />
+        </Suspense>
       </div>
     );
   }

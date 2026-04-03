@@ -1,10 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useWeeklyReport } from '../hooks/useWeeklyReport';
-import { useHistoryStore } from '../store/historyStore';
 import { WeeklyBarChart } from '../components/report/WeeklyBarChart';
-import { WeakWordList } from '../components/report/WeakWordList';
 import { AccuracyTrend } from '../components/report/AccuracyTrend';
+import { ModuleStatsCard } from '../components/report/ModuleStatsCard';
 
 function getDayLabels(): string[] {
   const result: string[] = [];
@@ -20,30 +19,13 @@ function getDayLabels(): string[] {
 export function Report() {
   const navigate = useNavigate();
   const stats = useWeeklyReport();
-  const sessions = useHistoryStore(s => s.sessions);
 
   const dayLabels = getDayLabels();
-
-  // 최근 7일 세션의 일별 평균 정확도 (AccuracyTrend용)
-  const dailyAccuracies: (number | null)[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const daySessions = sessions.filter(s => s.completedAt.slice(0, 10) === key);
-    if (daySessions.length > 0) {
-      const avg = daySessions.reduce((sum, s) => sum + s.accuracy, 0) / daySessions.length;
-      dailyAccuracies.push(Math.round(avg * 100) / 100);
-    } else {
-      dailyAccuracies.push(null);
-    }
-  }
-
   const isEmpty = stats.totalSessions === 0;
 
   return (
     <div className="h-screen overflow-y-auto safe-top safe-bottom">
-      <div className="min-h-full flex flex-col px-4 py-6 max-w-sm mx-auto">
+      <div className="min-h-full flex flex-col px-4 pt-4 pb-6 max-w-sm mx-auto">
 
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
@@ -54,7 +36,7 @@ export function Report() {
           </button>
           <div>
             <h1 className="text-xl font-bold text-white">최근 7일 훈련 분석</h1>
-            <p className="text-xs text-white/60">훈련 빈도, 정확도 추이, 약점 단어를 한눈에 확인하세요.</p>
+            <p className="text-xs text-white/60">훈련 빈도, 정확도 추이, 모듈별 성과를 한눈에 확인하세요.</p>
           </div>
         </div>
 
@@ -133,10 +115,10 @@ export function Report() {
             >
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">정확도 추이</p>
               <p className="mt-1 mb-4 text-xs text-gray-400">날짜별 정확도 변화로 최근 집중도 흐름을 살펴보세요.</p>
-              <AccuracyTrend accuracies={dailyAccuracies} labels={dayLabels} />
+              <AccuracyTrend accuracies={stats.dailyAccuracies} labels={dayLabels} />
             </motion.div>
 
-            {/* 약점 단어 */}
+            {/* 모듈별 통계 */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -144,10 +126,10 @@ export function Report() {
               className="bg-white rounded-2xl p-5"
             >
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">자주 틀린 단어</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">모듈별 훈련</p>
                 <span className="text-xs text-gray-400">최근 7일</span>
               </div>
-              <WeakWordList words={stats.weakWords} />
+              <ModuleStatsCard moduleStats={stats.moduleStats} />
             </motion.div>
 
             {/* 훈련 시작 CTA */}

@@ -39,6 +39,9 @@ export interface SessionRecord {
 export interface TrainingModuleProps {
   difficulty: Difficulty;
   mode?: string;
+  isDiagnosis?: boolean;
+  diagnosisLabel?: string;
+  diagnosisColor?: string;
   onComplete: (result: TrainingSessionResult) => void;
   onExit: () => void;
 }
@@ -67,6 +70,18 @@ export interface RecommendedTraining {
   difficulty: Difficulty;
   reason: string;
   suggestDifficultyChange: 'up' | 'down' | null;
+  profileLabel?: string;
+  profileTone?: 'calm' | 'balanced' | 'challenging';
+  goalLabel?: string;
+}
+
+export interface ModuleStat {
+  moduleId: string;
+  name: string;
+  icon: string;
+  sessions: number;
+  avgScore: number;
+  avgAccuracy: number;
 }
 
 export interface WeeklyStats {
@@ -74,8 +89,9 @@ export interface WeeklyStats {
   totalSessions: number;
   avgScore: number;
   avgAccuracy: number;
-  weakWords: string[];
   streakDays: number;
   dailyCounts: number[];
   dailyAvgScores: (number | null)[];
+  dailyAccuracies: (number | null)[];
+  moduleStats: ModuleStat[];
 }

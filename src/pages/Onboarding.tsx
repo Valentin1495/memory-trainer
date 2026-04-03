@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { flushSync } from 'react-dom';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { useGameStore } from '../store/gameStore';
+import { getGuestId } from '../lib/supabase';
 import type { TrainingGoal } from '../types/training';
 
 const GOALS: { id: TrainingGoal; label: string; desc: string; icon: string }[] = [
@@ -48,13 +49,7 @@ export function Onboarding() {
   const handleGoalNext = () => setStep('daily');
 
   const handleComplete = () => {
-    const userId = (() => {
-      const stored = localStorage.getItem('guestId');
-      if (stored) return stored;
-      const id = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
-      localStorage.setItem('guestId', id);
-      return id;
-    })();
+    const userId = getGuestId();
 
     const profile = {
       userId,

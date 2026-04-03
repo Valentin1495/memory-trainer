@@ -13,8 +13,10 @@ export function useRecommendation(): RecommendedTraining {
       return {
         moduleId: 'word-memory',
         difficulty: 'medium',
-        reason: '오늘의 첫 번째 훈련을 시작하세요',
+        reason: '오늘의 첫 훈련을 시작해보세요.',
         suggestDifficultyChange: null,
+        profileLabel: '현재 수준: 중간',
+        profileTone: 'balanced',
       };
     }
     return getRecommendedTraining(profile, sessions);

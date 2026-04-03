@@ -1,24 +1,45 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { ScoreRow } from '../components/leaderboard/ScoreRow';
 import type { GameMode, Difficulty } from '../types';
 
 type Period = 'daily' | 'weekly';
 
+const MODULE_TABS = [
+  { id: 'word-memory',      label: '단어' },
+  { id: 'color-sequence',   label: '색 순서' },
+  { id: 'number-sequence',  label: '숫자' },
+  { id: 'path-memory',      label: '경로' },
+  { id: 'shape-location',   label: '도형' },
+] as const;
+type ModuleId = typeof MODULE_TABS[number]['id'];
+
 const DIFFICULTY_TABS: { id: Difficulty; label: string; color: string; active: string }[] = [
-  { id: 'easy',   label: '🟢 EASY',   color: 'border-green-300 text-green-200',  active: 'bg-green-400 text-white border-green-400' },
+  { id: 'easy',   label: '🟢 EASY',   color: 'border-green-300 text-green-200',   active: 'bg-green-400 text-white border-green-400' },
   { id: 'medium', label: '🟡 MEDIUM', color: 'border-yellow-300 text-yellow-200', active: 'bg-yellow-400 text-white border-yellow-400' },
-  { id: 'hard',   label: '🔴 HARD',   color: 'border-red-300 text-red-200',       active: 'bg-red-400 text-white border-red-400' },
+  { id: 'hard',   label: '🔴 HARD',   color: 'border-red-300 text-red-200',        active: 'bg-red-400 text-white border-red-400' },
 ];
 
 export function Leaderboard() {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState<Period>('daily');
-  const [mode, setMode] = useState<GameMode>('basic');
+  const location = useLocation();
+  const initialModule = (location.state?.moduleId as ModuleId | undefined) ?? 'word-memory';
+
+  const [period, setPeriod]       = useState<Period>('daily');
+  const [moduleId, setModuleId]   = useState<ModuleId>(initialModule);
+  const [mode, setMode]           = useState<GameMode>('basic');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const { entries, isLoading, error, myRank, myScore, totalCount } = useLeaderboard({ period, mode, difficulty });
+
+  const isWordMemory = moduleId === 'word-memory';
+
+  const { entries, isLoading, error, myRank, myScore, totalCount } = useLeaderboard({
+    period,
+    moduleId,
+    mode:       isWordMemory ? mode : undefined,
+    difficulty,
+  });
 
   const topPercent = myRank && totalCount > 0
     ? Math.ceil((myRank / totalCount) * 100)
@@ -26,16 +47,13 @@ export function Leaderboard() {
 
   return (
     <div className="min-h-screen flex flex-col safe-top safe-bottom">
-      <header className="p-4 flex items-center">
-        <button
-          onClick={() => navigate('/')}
-          className="text-white/80 hover:text-white"
-        >
+      <header className="relative p-4 flex items-center">
+        <button onClick={() => navigate('/')} className="text-white/80 hover:text-white">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>
-        <h1 className="flex-1 text-center text-xl font-bold text-white">리더보드</h1>
+        <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-xl font-bold text-white">리더보드</h1>
         <div className="w-6" />
       </header>
 
@@ -63,18 +81,15 @@ export function Leaderboard() {
         </div>
       </div>
 
-      {/* 모드 탭 */}
-      <div className="px-4 pt-3">
-        <div className="flex gap-2 justify-center">
-          {([
-            { id: 'basic' as GameMode, label: '기본' },
-            { id: 'reverse' as GameMode, label: '리버스' },
-          ]).map(({ id, label }) => (
+      {/* 모듈 탭 */}
+      <div className="px-4 pt-3 overflow-x-auto">
+        <div className="flex gap-2 w-max mx-auto pb-1">
+          {MODULE_TABS.map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => setMode(id)}
-              className={`px-5 py-1.5 rounded-full text-sm font-semibold border-2 transition-all ${
-                mode === id
+              onClick={() => setModuleId(id)}
+              className={`relative px-4 py-1.5 rounded-full text-sm font-semibold border-2 transition-all whitespace-nowrap ${
+                moduleId === id
                   ? 'bg-white text-purple-700 border-white shadow'
                   : 'bg-transparent text-white/70 border-white/30 hover:border-white/60 hover:text-white'
               }`}
@@ -84,6 +99,38 @@ export function Leaderboard() {
           ))}
         </div>
       </div>
+
+      {/* 모드 탭 — 단어 기억에만 표시 */}
+      <AnimatePresence initial={false}>
+        {isWordMemory && (
+          <motion.div
+            key="mode-tabs"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pt-2 flex gap-2 justify-center">
+              {([
+                { id: 'basic' as GameMode, label: '기본' },
+                { id: 'reverse' as GameMode, label: '리버스' },
+              ]).map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setMode(id)}
+                  className={`px-5 py-1.5 rounded-full text-sm font-semibold border-2 transition-all ${
+                    mode === id
+                      ? 'bg-white text-purple-700 border-white shadow'
+                      : 'bg-transparent text-white/70 border-white/30 hover:border-white/60 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 난이도 탭 */}
       <div className="px-4 pt-2 pb-1">
@@ -179,7 +226,6 @@ export function Leaderboard() {
             </div>
           </motion.div>
         )}
-
         <div className="pb-6" />
       </div>
     </div>

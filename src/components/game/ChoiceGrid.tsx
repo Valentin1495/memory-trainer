@@ -65,24 +65,6 @@ export function ChoiceGrid({
             whileTap={!isDisabled ? { scale: 0.95 } : {}}
           >
             {word.word}
-            {state === 'correct' && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="ml-2"
-              >
-                ✓
-              </motion.span>
-            )}
-            {state === 'wrong' && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="ml-2"
-              >
-                ✗
-              </motion.span>
-            )}
           </motion.button>
         );
       })}

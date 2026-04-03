@@ -16,11 +16,10 @@ body {
 }
 
 /* iOS 노치/Dynamic Island safe area */
-.safe-top {
+.safe-top,
+.safe-top-home,
+.safe-top-training {
   padding-top: env(safe-area-inset-top);
-}
-.safe-top-home {
-  padding-top: calc(env(safe-area-inset-top) - 20px);
 }
 
 .safe-bottom {
