@@ -1,22 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, getGuestId } from '../lib/supabase';
+import { supabase, getGuestId, getNickname } from '../lib/supabase';
 import type { LeaderboardEntry, GameMode, Difficulty } from '../types';
+import type { TrainingSessionResult } from '../types/training';
 
 type Period = 'daily' | 'weekly';
 
 interface UseLeaderboardOptions {
   period: Period;
+  moduleId?: string;
   mode?: GameMode;
   difficulty?: Difficulty;
 }
 
-export function useLeaderboard({ period, mode, difficulty }: UseLeaderboardOptions) {
+export function useLeaderboard({ period, moduleId, mode, difficulty }: UseLeaderboardOptions) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myRank, setMyRank] = useState<number | null>(null);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const fetchLeaderboard = useCallback(async () => {
     setIsLoading(true);
@@ -53,6 +56,9 @@ export function useLeaderboard({ period, mode, difficulty }: UseLeaderboardOptio
         .order('created_at', { ascending: true })
         .limit(1000);
 
+      if (moduleId) {
+        query = query.eq('module_id', moduleId);
+      }
       if (mode) {
         query = query.eq('mode', mode);
       }
@@ -112,7 +118,7 @@ export function useLeaderboard({ period, mode, difficulty }: UseLeaderboardOptio
     } finally {
       setIsLoading(false);
     }
-  }, [period, mode, difficulty]);
+  }, [period, moduleId, mode, difficulty]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -124,25 +130,66 @@ export function useLeaderboard({ period, mode, difficulty }: UseLeaderboardOptio
     timeMs: number,
     wrongCount: number,
     gameMode: GameMode,
-    difficulty: Difficulty
+    difficulty: Difficulty,
+    result?: TrainingSessionResult
   ) => {
     try {
+      setSubmitError(null);
       const guestId = getGuestId();
+      const safeNickname = nickname.trim() || getNickname()?.trim() || '게스트';
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-      const { error: submitError } = await supabase
-        .from('scores')
-        .insert({
-          guest_id: guestId,
-          nickname,
-          score,
-          time_ms: timeMs,
-          missed_count: wrongCount,
-          mode: gameMode,
-          difficulty,
-          date: today,
-        });
+      const legacyPayload = {
+        guest_id: guestId,
+        nickname: safeNickname,
+        score,
+        time_ms: timeMs,
+        missed_count: wrongCount,
+        mode: gameMode,
+        difficulty,
+        date: today,
+      };
+
+      const expandedPayload = result
+        ? {
+            ...legacyPayload,
+            module_id: result.moduleId,
+            accuracy: result.accuracy,
+            review_count: Number(result.metadata.reviewCount ?? 0),
+            metadata: result.metadata,
+            is_success: result.metadata.isSuccess ?? result.accuracy >= 1,
+          }
+        : null;
+
+      let submitError: Error | null = null;
+
+      if (expandedPayload) {
+        const { error } = await supabase
+          .from('scores')
+          .insert(expandedPayload);
+        submitError = error;
+      }
+
+      if (submitError) {
+        const message = submitError.message.toLowerCase();
+        const canFallbackToLegacy =
+          message.includes('column') ||
+          message.includes('schema cache') ||
+          message.includes('could not find') ||
+          message.includes('does not exist');
+
+        if (!canFallbackToLegacy) {
+          throw submitError;
+        }
+      }
+
+      if (!expandedPayload || submitError) {
+        const { error } = await supabase
+          .from('scores')
+          .insert(legacyPayload);
+        submitError = error;
+      }
 
       if (submitError) {
         throw submitError;
@@ -152,6 +199,8 @@ export function useLeaderboard({ period, mode, difficulty }: UseLeaderboardOptio
       return true;
     } catch (err) {
       console.error('Failed to submit score:', err);
+      const message = err instanceof Error ? err.message : '점수 업로드에 실패했어요.';
+      setSubmitError(message);
       return false;
     }
   }, [fetchLeaderboard]);
@@ -163,6 +212,7 @@ export function useLeaderboard({ period, mode, difficulty }: UseLeaderboardOptio
     myRank,
     myScore,
     totalCount,
+    submitError,
     refetch: fetchLeaderboard,
     submitScore,
   };

@@ -65,12 +65,13 @@ export function WordDisplay({ words, wordDurationMs, difficulty, onComplete }: W
     }
   }, [displayPhase, showWord, currentIndex, words.length, wordDurationMs, variants.blankDurationMs]);
 
+  const isLastWord = currentIndex === words.length - 1;
   const progress = displayPhase === 'flashing'
-    ? ((currentIndex + (showWord ? 0.5 : 1)) / words.length) * 100
+    ? ((currentIndex + (isLastWord ? 1 : showWord ? 0.5 : 1)) / words.length) * 100
     : displayPhase === 'done' ? 100 : 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+    <div className="flex flex-col items-center justify-center flex-1 px-4 pb-40">
       <div className="w-full max-w-xs mb-10">
         <div className="flex justify-between text-white/70 text-sm mb-2">
           <span>
