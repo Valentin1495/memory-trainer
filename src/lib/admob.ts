@@ -40,6 +40,11 @@ async function ensureTrackingAuthorization(): Promise<void> {
   }
 }
 
+export async function requestTrackingPermission(): Promise<void> {
+  if (!isNative()) return;
+  await ensureTrackingAuthorization();
+}
+
 async function loadInterstitial(): Promise<void> {
   if (!isNative() || loadingInterstitial) return;
   loadingInterstitial = true;
@@ -58,7 +63,7 @@ export async function initAdMob(): Promise<void> {
   if (!isNative() || initializingAdMob) return;
   initializingAdMob = true;
   try {
-    await ensureTrackingAuthorization();
+    await requestTrackingPermission();
     await AdMob.initialize();
     await loadInterstitial();
   } catch (e) {

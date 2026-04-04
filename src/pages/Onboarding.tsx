@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { useGameStore } from '../store/gameStore';
 import { getGuestId } from '../lib/supabase';
+import { requestTrackingPermission } from '../lib/admob';
 import type { TrainingGoal } from '../types/training';
 
 const GOALS: { id: TrainingGoal; label: string; desc: string; icon: string }[] = [
@@ -139,6 +140,10 @@ export function Onboarding() {
   }, [platform, step]);
 
   useEffect(() => {
+    void requestTrackingPermission();
+  }, []);
+
+  useEffect(() => {
     if (!isNicknameFocused || step !== 'nickname' || keyboardInset <= 0) return;
 
     const timer = window.setTimeout(() => {
@@ -227,7 +232,7 @@ export function Onboarding() {
                 className="flex flex-col items-center"
               >
               <p className="text-5xl mb-6">🧠</p>
-              <h1 className="text-3xl font-bold text-white text-center mb-2">기억력 트레이너</h1>
+              <h1 className="text-3xl font-bold text-white text-center mb-2">기억 코치</h1>
               <p className="text-white/70 text-center mb-8 text-sm">
                 개인 맞춤형 기억력 훈련 프로그램에 오신 것을 환영합니다
               </p>
