@@ -411,7 +411,18 @@ function Grid({ phase, placements, answers, onTap, cellStatus }: GridProps) {
               {status === 'correct' && answeredShape && (
                 <motion.div key="correct" initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-0.5">
                   <ShapeIcon id={answeredShape} className="w-7 h-7" color="white" />
-                  <span className="text-[11px] font-black text-white leading-none">✓</span>
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="h-3.5 w-3.5 drop-shadow-sm"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4.5 10.5l3.2 3.2L15.5 6.5" />
+                  </svg>
                 </motion.div>
               )}
 
@@ -419,7 +430,19 @@ function Grid({ phase, placements, answers, onTap, cellStatus }: GridProps) {
               {status === 'wrong' && answeredShape && correctShape && (
                 <motion.div key="wrong" initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center" style={{ gap: 1 }}>
                   <ShapeIcon id={answeredShape} className="w-3 h-3 opacity-50" color="white" />
-                  <span className="text-[8px] text-white/70 leading-none">↓</span>
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="h-2.5 w-2.5 text-white/70"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M10 4v10" />
+                    <path d="M6.5 10.5L10 14l3.5-3.5" />
+                  </svg>
                   <ShapeIcon id={correctShape}  className="w-6 h-6" color="white" />
                 </motion.div>
               )}
@@ -428,7 +451,18 @@ function Grid({ phase, placements, answers, onTap, cellStatus }: GridProps) {
               {status === 'false-alarm' && answeredShape && (
                 <motion.div key="false-alarm" initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-0.5">
                   <ShapeIcon id={answeredShape} className="w-6 h-6 opacity-60" color="white" />
-                  <span className="text-[11px] font-black text-white leading-none">✕</span>
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="h-3.5 w-3.5 drop-shadow-sm"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 6l8 8M14 6l-8 8" />
+                  </svg>
                 </motion.div>
               )}
 

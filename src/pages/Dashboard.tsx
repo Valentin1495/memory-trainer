@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUserProfileStore } from '../store/userProfileStore';
@@ -13,7 +13,8 @@ import { MiniHeatmap } from '../components/dashboard/MiniHeatmap';
 import { TRAINING_REGISTRY } from '../training/registry';
 import type { TrainingModuleDefinition } from '../types/training';
 import type { Difficulty, GameMode } from '../types';
-import { purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
+import { initIAP, purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
+import { initAdMob } from '../lib/admob';
 
 function getDayLabels(): string[] {
   const labels = ['일', '월', '화', '수', '목', '금', '토'];
@@ -44,6 +45,11 @@ export function Dashboard() {
   const [pickedDifficulty, setPickedDifficulty] = useState<Difficulty>('medium');
   const [pickedMode, setPickedMode] = useState<GameMode>('basic');
   const showDiagnosisBanner = profile?.diagnosisDeferred === true && !profile?.diagnosisComplete;
+
+  useEffect(() => {
+    initAdMob();
+    initIAP();
+  }, []);
 
   const todaySessions = getTodaySessions();
   const streak = getStreakDays();
@@ -96,6 +102,7 @@ export function Dashboard() {
       // ignored
     }
     setIapLoading(false);
+    setShowIapSheet(false);
   };
 
   if (isLoading) {

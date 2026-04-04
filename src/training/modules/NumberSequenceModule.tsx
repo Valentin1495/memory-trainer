@@ -30,6 +30,7 @@ export function NumberSequenceModule({ difficulty, onComplete, onExit }: Trainin
   const [sequence]          = useState<number[]>(() => generateSequence(seqLength));
   const [phase, setPhase]   = useState<Phase>('memorize');
   const [activeIdx, setActiveIdx] = useState<number>(-1);
+  const [shownCount, setShownCount] = useState(0);
   const [userInput, setUserInput] = useState<number[]>([]);
   const [revealed, setRevealed]   = useState(false);
   const [resultReady, setResultReady] = useState<TrainingSessionResult | null>(null);
@@ -41,6 +42,7 @@ export function NumberSequenceModule({ difficulty, onComplete, onExit }: Trainin
     if (phase !== 'memorize') return;
     let cancelled = false;
     let i = 0;
+    setShownCount(0);
     function flashNext() {
       if (cancelled) return;
       if (i >= sequence.length) {
@@ -49,6 +51,7 @@ export function NumberSequenceModule({ difficulty, onComplete, onExit }: Trainin
         return;
       }
       setActiveIdx(i);
+      setShownCount(i + 1);
       setTimeout(() => {
         if (cancelled) return;
         setActiveIdx(-1);
@@ -181,8 +184,13 @@ export function NumberSequenceModule({ difficulty, onComplete, onExit }: Trainin
               {sequence.map((_, i) => (
                 <motion.div
                   key={i}
-                  className={`w-2.5 h-2.5 rounded-full ${i <= activeIdx ? 'bg-white' : 'bg-white/30'}`}
-                  animate={{ scale: i === activeIdx ? 1.6 : 1 }}
+                  className={`w-2.5 h-2.5 rounded-full ${i < shownCount ? 'bg-white' : 'bg-white/30'}`}
+                  animate={
+                    i === activeIdx
+                      ? { scale: [1, 1.6, 1], opacity: [1, 0.45, 1] }
+                      : { scale: 1, opacity: 1 }
+                  }
+                  transition={{ duration: 0.35 }}
                 />
               ))}
             </div>

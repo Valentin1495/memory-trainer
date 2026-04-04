@@ -1,11 +1,15 @@
+/// <reference types="@capacitor/keyboard" />
+
 import type { CapacitorConfig } from '@capacitor/cli';
+import { KeyboardResize } from '@capacitor/keyboard';
 import { loadEnv } from 'vite';
 
 const env = loadEnv(process.env.NODE_ENV ?? 'development', process.cwd(), '');
 
 const installAppName = env.APP_INSTALL_NAME?.trim() || '기억력 트레이너';
 const liveReloadUrl = env.CAP_SERVER_URL?.trim();
-const isLiveReloadEnabled = Boolean(liveReloadUrl);
+const isLiveReloadEnabled =
+  process.env.CAP_LIVE_RELOAD === '1' && Boolean(liveReloadUrl);
 
 const config: CapacitorConfig = {
   appId: 'com.memorychallenge.app',
@@ -28,6 +32,9 @@ const config: CapacitorConfig = {
     AdMob: {
       appIdAndroid: env.ADMOB_APP_ID_ANDROID,
       appIdIos: env.ADMOB_APP_ID_IOS,
+    },
+    Keyboard: {
+      resize: KeyboardResize.None,
     },
   },
 };

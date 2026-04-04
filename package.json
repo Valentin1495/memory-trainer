@@ -11,9 +11,9 @@
     "postinstall": "patch-package",
     "cap:sync:dev": "npx cap sync",
     "cap:sync": "npm run build && npx cap sync",
-    "cap:ios:dev": "npx cap sync ios && npx cap open ios",
+    "cap:ios:dev": "CAP_LIVE_RELOAD=1 npx cap sync ios && npx cap open ios",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
-    "cap:android:dev": "npx cap sync android && npx cap open android",
+    "cap:android:dev": "CAP_LIVE_RELOAD=1 npx cap sync android && npx cap open android",
     "cap:android": "npm run build && npx cap sync android && npx cap open android"
   },
   "dependencies": {
@@ -22,6 +22,8 @@
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@capacitor/ios": "^8.1.0",
+    "@capacitor/keyboard": "^8.0.2",
+    "@emotion/is-prop-valid": "^1.4.0",
     "@supabase/supabase-js": "^2.98.0",
     "cordova-plugin-purchase": "^13.13.1",
     "framer-motion": "^12.34.3",

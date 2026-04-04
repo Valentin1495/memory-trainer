@@ -40,6 +40,7 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
   const [sequence] = useState<string[]>(() => generateSequence(seqLength));
   const [phase, setPhase] = useState<Phase>('memorize');
   const [activeIdx, setActiveIdx] = useState<number>(-1);
+  const [shownCount, setShownCount] = useState(0);
   const [userInput, setUserInput] = useState<string[]>([]);
   const [wrongIdx, setWrongIdx] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -52,6 +53,7 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
 
     let cancelled = false;
     let i = 0;
+    setShownCount(0);
 
     function flashNext() {
       if (cancelled) return;
@@ -65,6 +67,7 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
       }
 
       setActiveIdx(i);
+      setShownCount(i + 1);
       setTimeout(() => {
         if (cancelled) return;
         setActiveIdx(-1);
@@ -216,8 +219,15 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
               {sequence.map((_, index) => (
                 <motion.div
                   key={index}
-                  className={`w-2 h-2 rounded-full ${index <= activeIdx ? 'bg-white' : 'bg-white/30'}`}
-                  animate={{ scale: index === activeIdx ? 1.5 : 1 }}
+                  className={`w-2 h-2 rounded-full ${
+                    index < shownCount ? 'bg-white' : 'bg-white/30'
+                  }`}
+                  animate={
+                    index === activeIdx
+                      ? { scale: [1, 1.5, 1], opacity: [1, 0.45, 1] }
+                      : { scale: 1, opacity: 1 }
+                  }
+                  transition={{ duration: 0.35 }}
                 />
               ))}
             </div>
@@ -279,8 +289,34 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
                           : `${color!.bg} border-white/40`
                       }`}
                     >
-                      {revealed && isCorrect && <span className="text-[10px] font-black text-white">✓</span>}
-                      {revealed && isWrong   && <span className="text-[10px] font-black text-white">✕</span>}
+                      {revealed && isCorrect && (
+                        <svg
+                          viewBox="0 0 20 20"
+                          className="h-3.5 w-3.5 drop-shadow-sm"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M4.5 10.5l3.2 3.2L15.5 6.5" />
+                        </svg>
+                      )}
+                      {revealed && isWrong && (
+                        <svg
+                          viewBox="0 0 20 20"
+                          className="h-3.5 w-3.5 drop-shadow-sm"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M6 6l8 8M14 6l-8 8" />
+                        </svg>
+                      )}
                     </motion.div>
                   );
                 })}
