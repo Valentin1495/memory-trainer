@@ -15,33 +15,53 @@ function getInterstitialAdId(): string {
 
 let interstitialReady = false;
 let loadingInterstitial = false;
-let initializingAdMob = false;
 const AD_FREQUENCY = 3;
 let sessionsSinceLastAd = 0;
 const AD_COOLDOWN_MS = 3 * 60 * 1000; // 3분
 let lastAdShownAt: number | null = null;
 
+// AdMob.initialize()는 ATT API 호출 전에 반드시 완료되어야 함 (실기기)
+// Promise로 관리해 중복 초기화 방지 및 동시 호출 시 동일 Promise 공유
+let admobInitialized = false;
+let admobInitPromise: Promise<void> | null = null;
+
+async function ensureAdMobInitialized(): Promise<void> {
+  if (admobInitialized) return;
+  if (!admobInitPromise) {
+    admobInitPromise = (async () => {
+      try {
+        await AdMob.initialize();
+        admobInitialized = true;
+      } catch (e) {
+        console.warn('[AdMob] initialize failed', e);
+      }
+    })();
+  }
+  await admobInitPromise;
+}
+
 async function ensureTrackingAuthorization(): Promise<void> {
   if (Capacitor.getPlatform() !== 'ios') return;
-
   try {
-    const trackingStatus = await AdMob.trackingAuthorizationStatus();
-
-    if (trackingStatus.status === 'notDetermined') {
+    const { status } = await AdMob.trackingAuthorizationStatus();
+    if (status === 'notDetermined') {
       await AdMob.requestTrackingAuthorization();
-      const updatedStatus = await AdMob.trackingAuthorizationStatus();
-      console.info('[AdMob] ATT status after prompt:', updatedStatus.status);
-      return;
     }
-
-    console.info('[AdMob] ATT status before init:', trackingStatus.status);
   } catch (e) {
-    console.warn('[AdMob] tracking authorization check failed', e);
+    console.warn('[AdMob] ATT check failed', e);
   }
 }
 
+/** 앱 시작 직후 AdMob 초기화를 백그라운드에서 미리 시작 */
+export function warmUpAdMob(): void {
+  if (!isNative()) return;
+  void ensureAdMobInitialized();
+}
+
+/** 온보딩에서 호출: initialize 완료 후 ATT 팝업 표시 */
 export async function requestTrackingPermission(): Promise<void> {
   if (!isNative()) return;
+  await ensureAdMobInitialized(); // 실기기에서 ATT API 사용 전 필수
   await ensureTrackingAuthorization();
 }
 
@@ -59,18 +79,12 @@ async function loadInterstitial(): Promise<void> {
   }
 }
 
+/** Dashboard에서 호출: 기존 사용자 ATT 처리 + 광고 로딩 */
 export async function initAdMob(): Promise<void> {
-  if (!isNative() || initializingAdMob) return;
-  initializingAdMob = true;
-  try {
-    await requestTrackingPermission();
-    await AdMob.initialize();
-    await loadInterstitial();
-  } catch (e) {
-    console.warn('[AdMob] initialize failed', e);
-  } finally {
-    initializingAdMob = false;
-  }
+  if (!isNative()) return;
+  await ensureAdMobInitialized();
+  await ensureTrackingAuthorization(); // 온보딩을 건너뛴 기존 사용자 대응
+  await loadInterstitial();
 }
 
 export async function showInterstitialAd(): Promise<void> {

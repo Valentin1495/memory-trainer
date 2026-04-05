@@ -22,7 +22,7 @@ const DAILY_GOALS = [
   { minutes: 5, label: '5분', desc: '집중' },
 ];
 
-type OnboardingStep = 'nickname' | 'goal' | 'daily';
+type OnboardingStep = 'nickname' | 'tracking' | 'goal' | 'daily';
 
 export function Onboarding() {
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ export function Onboarding() {
   const nicknameCardRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const stepIndex = step === 'nickname' ? 0 : step === 'goal' ? 1 : 2;
+  const stepIndex = step === 'nickname' ? 0 : step === 'tracking' ? 1 : step === 'goal' ? 2 : 3;
   const keyboardInset =
     shouldUseManualKeyboardAvoidance && step === 'nickname' && isNicknameFocused
       ? keyboardHeight
@@ -140,10 +140,6 @@ export function Onboarding() {
   }, [platform, step]);
 
   useEffect(() => {
-    void requestTrackingPermission();
-  }, []);
-
-  useEffect(() => {
     if (!isNicknameFocused || step !== 'nickname' || keyboardInset <= 0) return;
 
     const timer = window.setTimeout(() => {
@@ -161,7 +157,7 @@ export function Onboarding() {
     containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [isNicknameFocused, keyboardInset]);
 
-  const handleNicknameNext = () => {
+  const handleNicknameNext = async () => {
     const trimmed = nickname.trim();
     if (!trimmed) {
       setNicknameError(true);
@@ -169,6 +165,17 @@ export function Onboarding() {
       inputRef.current?.focus();
       return;
     }
+
+    // iOS에서만 tracking 사전 안내 단계 표시
+    if (platform === 'ios') {
+      setStep('tracking');
+    } else {
+      setStep('goal');
+    }
+  };
+
+  const handleTrackingNext = async () => {
+    await requestTrackingPermission();
     setStep('goal');
   };
 
@@ -211,7 +218,7 @@ export function Onboarding() {
       >
         {/* Progress dots */}
         <div className="flex gap-2 mb-10">
-          {[0, 1, 2].map(i => (
+          {[0, 1, 2, 3].map(i => (
             <div
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${i === stepIndex ? 'w-8 bg-white' : i < stepIndex ? 'w-4 bg-white/60' : 'w-4 bg-white/20'
@@ -231,43 +238,81 @@ export function Onboarding() {
                 exit={{ opacity: 0, x: -40 }}
                 className="flex flex-col items-center"
               >
-              <p className="text-5xl mb-6">🧠</p>
-              <h1 className="text-3xl font-bold text-white text-center mb-2">기억 코치</h1>
-              <p className="text-white/70 text-center mb-8 text-sm">
-                개인 맞춤형 기억력 훈련 프로그램에 오신 것을 환영합니다
-              </p>
-              <div ref={nicknameCardRef} className="w-full">
-                <div className="bg-white rounded-2xl p-6 w-full shadow-xl">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">닉네임</label>
-                  <motion.input
-                    ref={inputRef}
-                    type="text"
-                    value={nickname}
-                    onChange={e => { setNicknameLocal(e.target.value); setNicknameError(false); }}
-                    onKeyDown={e => e.key === 'Enter' && handleNicknameNext()}
-                    onFocus={() => setIsNicknameFocused(true)}
-                    onBlur={() => setIsNicknameFocused(false)}
-                    placeholder="이름 또는 별명을 입력하세요"
-                    maxLength={10}
-                    autoFocus
-                    animate={nicknameError ? { x: [0, -8, 8, -5, 5, 0] } : {}}
-                    transition={{ duration: 0.35 }}
-                    className={`w-full px-4 py-3 rounded-xl border-2 text-gray-800 outline-none transition-colors ${nicknameError ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-purple-400'
-                      }`}
-                  />
-                  {nicknameError && (
-                    <p className="mt-1.5 text-xs text-red-500">닉네임을 입력해 주세요</p>
-                  )}
-                  <motion.button
-                    onClick={handleNicknameNext}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full mt-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow"
-                  >
-                    다음
-                  </motion.button>
+                <p className="text-5xl mb-6">🧠</p>
+                <h1 className="text-3xl font-bold text-white text-center mb-2">기억 트레이너</h1>
+                <p className="text-white/70 text-center mb-8 text-sm">
+                  개인 맞춤형 기억력 훈련 프로그램에 오신 것을 환영합니다
+                </p>
+                <div ref={nicknameCardRef} className="w-full">
+                  <div className="bg-white rounded-2xl p-6 w-full shadow-xl">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">닉네임</label>
+                    <motion.input
+                      ref={inputRef}
+                      type="text"
+                      value={nickname}
+                      onChange={e => { setNicknameLocal(e.target.value); setNicknameError(false); }}
+                      onKeyDown={e => e.key === 'Enter' && handleNicknameNext()}
+                      onFocus={() => setIsNicknameFocused(true)}
+                      onBlur={() => setIsNicknameFocused(false)}
+                      placeholder="이름 또는 별명을 입력하세요"
+                      maxLength={10}
+                      autoFocus
+                      animate={nicknameError ? { x: [0, -8, 8, -5, 5, 0] } : {}}
+                      transition={{ duration: 0.35 }}
+                      className={`w-full px-4 py-3 rounded-xl border-2 text-gray-800 outline-none transition-colors ${nicknameError ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-purple-400'
+                        }`}
+                    />
+                    {nicknameError && (
+                      <p className="mt-1.5 text-xs text-red-500">닉네임을 입력해 주세요</p>
+                    )}
+                    <motion.button
+                      onClick={handleNicknameNext}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full mt-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow"
+                    >
+                      다음
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
+            )}
+
+            {step === 'tracking' && (
+              <motion.div
+                key="tracking"
+                initial={{ opacity: 0, x: 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -40 }}
+                className="flex flex-col items-center"
+              >
+                <p className="text-5xl mb-6">🎯</p>
+                <h2 className="text-2xl font-bold text-white text-center mb-2">맞춤 광고 안내</h2>
+                <p className="text-white/70 text-center mb-8 text-sm">
+                  다음 화면에서 광고 개인화 여부를 선택할 수 있어요
+                </p>
+                <div className="bg-white rounded-2xl p-6 w-full shadow-xl mb-6">
+                  <ul className="space-y-4">
+                    {[
+                      { icon: '✅', text: '허용하면 관련성 높은 광고만 표시됩니다' },
+                      { icon: '🔒', text: '수집된 정보는 광고 최적화에만 사용됩니다' },
+                      { icon: '🙅', text: '허용하지 않아도 앱 이용에 전혀 지장 없습니다' },
+                    ].map(({ icon, text }) => (
+                      <li key={text} className="flex items-start gap-3">
+                        <span className="text-lg leading-snug">{icon}</span>
+                        <span className="text-sm text-gray-600 leading-snug">{text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <motion.button
+                  onClick={handleTrackingNext}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
+                >
+                  확인
+                </motion.button>
               </motion.div>
             )}
 
@@ -279,47 +324,47 @@ export function Onboarding() {
                 exit={{ opacity: 0, x: -40 }}
                 className="flex flex-col items-center"
               >
-              <h2 className="text-2xl font-bold text-white text-center mb-2">훈련 목표</h2>
-              <p className="text-white/70 text-center mb-6 text-sm">
-                주요 목표를 선택하면 맞춤 훈련을 추천해 드려요
-              </p>
-              <div className="w-full flex flex-col gap-3 mb-6">
-                {GOALS.map(g => (
-                  <button
-                    key={g.id}
-                    onClick={() => setGoal(g.id)}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${goal === g.id
-                      ? 'border-white bg-white/20 shadow-lg'
-                      : 'border-white/20 bg-white/10 hover:bg-white/15'
-                      }`}
-                  >
-                    <span className="text-3xl">{g.icon}</span>
-                    <div>
-                      <p className="font-bold text-white">{g.label}</p>
-                      <p className="text-white/70 text-sm">{g.desc}</p>
-                    </div>
-                    {goal === g.id && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="ml-auto w-5 h-5 bg-white rounded-full flex items-center justify-center"
-                      >
-                        <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </motion.div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <motion.button
-                onClick={handleGoalNext}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
-              >
-                다음
-              </motion.button>
+                <h2 className="text-2xl font-bold text-white text-center mb-2">훈련 목표</h2>
+                <p className="text-white/70 text-center mb-6 text-sm">
+                  주요 목표를 선택하면 맞춤 훈련을 추천해 드려요
+                </p>
+                <div className="w-full flex flex-col gap-3 mb-6">
+                  {GOALS.map(g => (
+                    <button
+                      key={g.id}
+                      onClick={() => setGoal(g.id)}
+                      className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${goal === g.id
+                        ? 'border-white bg-white/20 shadow-lg'
+                        : 'border-white/20 bg-white/10 hover:bg-white/15'
+                        }`}
+                    >
+                      <span className="text-3xl">{g.icon}</span>
+                      <div>
+                        <p className="font-bold text-white">{g.label}</p>
+                        <p className="text-white/70 text-sm">{g.desc}</p>
+                      </div>
+                      {goal === g.id && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="ml-auto w-5 h-5 bg-white rounded-full flex items-center justify-center"
+                        >
+                          <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </motion.div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <motion.button
+                  onClick={handleGoalNext}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
+                >
+                  다음
+                </motion.button>
               </motion.div>
             )}
 
@@ -331,46 +376,46 @@ export function Onboarding() {
                 exit={{ opacity: 0, x: -40 }}
                 className="flex flex-col items-center"
               >
-              <h2 className="text-2xl font-bold text-white text-center mb-2">하루 목표 시간</h2>
-              <p className="text-white/70 text-center mb-6 text-sm">
-                매일 얼마나 훈련할지 정해보세요
-              </p>
-              <div className="w-full flex flex-col gap-3 mb-6">
-                {DAILY_GOALS.map(d => (
-                  <button
-                    key={d.minutes}
-                    onClick={() => setDailyGoal(d.minutes)}
-                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${dailyGoal === d.minutes
-                      ? 'border-white bg-white/20'
-                      : 'border-white/20 bg-white/10 hover:bg-white/15'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl font-black text-white">{d.label}</span>
-                      <span className="text-white/70 text-sm">{d.desc}</span>
-                    </div>
-                    {dailyGoal === d.minutes && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-5 h-5 bg-white rounded-full flex items-center justify-center"
-                      >
-                        <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </motion.div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <motion.button
-                onClick={handleComplete}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
-              >
-                시작하기
-              </motion.button>
+                <h2 className="text-2xl font-bold text-white text-center mb-2">하루 목표 시간</h2>
+                <p className="text-white/70 text-center mb-6 text-sm">
+                  매일 얼마나 훈련할지 정해보세요
+                </p>
+                <div className="w-full flex flex-col gap-3 mb-6">
+                  {DAILY_GOALS.map(d => (
+                    <button
+                      key={d.minutes}
+                      onClick={() => setDailyGoal(d.minutes)}
+                      className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${dailyGoal === d.minutes
+                        ? 'border-white bg-white/20'
+                        : 'border-white/20 bg-white/10 hover:bg-white/15'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-black text-white">{d.label}</span>
+                        <span className="text-white/70 text-sm">{d.desc}</span>
+                      </div>
+                      {dailyGoal === d.minutes && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="w-5 h-5 bg-white rounded-full flex items-center justify-center"
+                        >
+                          <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </motion.div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <motion.button
+                  onClick={handleComplete}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
+                >
+                  시작하기
+                </motion.button>
               </motion.div>
             )}
 

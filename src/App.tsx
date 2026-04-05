@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Leaderboard } from './pages/Leaderboard';
 import { Dashboard } from './pages/Dashboard';
@@ -8,6 +9,7 @@ import { SessionResult } from './pages/SessionResult';
 import { Report } from './pages/Report';
 import { Settings } from './pages/Settings';
 import { useUserProfileStore } from './store/userProfileStore';
+import { warmUpAdMob } from './lib/admob';
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const isOnboarded = useUserProfileStore(s => s.isOnboarded);
@@ -29,6 +31,10 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  useEffect(() => {
+    warmUpAdMob();
+  }, []);
+
   return (
     <OnboardingGuard>
       <Routes>

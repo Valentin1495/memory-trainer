@@ -1,8 +1,8 @@
-# Store Metadata — 개인 맞춤형 기억력 트레이너
+# Store Metadata — 개인 맞춤형 기억 트레이너
 
 ## App Identity
 
-- App name (한국어): 기억력 트레이너 — 개인 맞춤 두뇌 훈련
+- App name (한국어): 기억 트레이너 — 개인 맞춤 두뇌 훈련
 - App name (English): Memory Trainer — Personalized Brain Training
 - Bundle ID / App ID: `com.memorytrainer.personal` ← 변경 권장 (기존: com.memorychallenge.app)
 - Version: `2.0.0`
@@ -25,8 +25,8 @@
 [이 앱이 다른 메모리 게임과 다른 이유]
 
 대부분의 메모리 게임은 점수만 보여주고 끝납니다.
-기억력 트레이너는 당신의 훈련 데이터를 분석해 약점을 찾고,
-다음 훈련을 자동으로 추천하는 **개인 두뇌 훈련 코치**입니다.
+기억 트레이너는 당신의 훈련 데이터를 분석해 약점을 찾고,
+다음 훈련을 자동으로 추천하는 **개인 두뇌 훈련 트레이너**입니다.
 
 ---
 
