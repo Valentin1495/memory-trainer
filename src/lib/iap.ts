@@ -8,7 +8,12 @@ const PRODUCT_ID =
 
 let iapInitPromise: Promise<void> | null = null;
 let iapListenersRegistered = false;
-let restoreInFlight: Promise<void> | null = null;
+let restoreInFlight: Promise<RestoreResult> | null = null;
+
+function syncAdRemovedState(): void {
+  if (typeof CdvPurchase === 'undefined') return;
+  useSettingsStore.getState().setAdRemoved(CdvPurchase.store.owned(PRODUCT_ID));
+}
 
 function isNative(): boolean {
   return Capacitor.isNativePlatform();
@@ -46,7 +51,7 @@ export async function initIAP(): Promise<void> {
         .when()
         .approved((transaction) => {
           if (transaction.products.some((p) => p.id === PRODUCT_ID)) {
-            useSettingsStore.getState().setAdRemoved(true);
+            syncAdRemovedState();
           }
           transaction.finish();
         });
@@ -55,9 +60,7 @@ export async function initIAP(): Promise<void> {
       CdvPurchase.store
         .when()
         .receiptUpdated(() => {
-          if (CdvPurchase.store.owned(PRODUCT_ID)) {
-            useSettingsStore.getState().setAdRemoved(true);
-          }
+          syncAdRemovedState();
         });
 
       iapListenersRegistered = true;
@@ -65,6 +68,7 @@ export async function initIAP(): Promise<void> {
 
     try {
       await CdvPurchase.store.initialize([platform]);
+      syncAdRemovedState();
     } catch (e) {
       iapInitPromise = null;
       console.warn('[IAP] initialize failed', e);
@@ -81,37 +85,66 @@ export function getNoAdsPrice(): string | undefined {
   return product?.getOffer()?.pricingPhases[0]?.price;
 }
 
+export type PurchaseResult = 'started' | 'cancelled' | 'failed';
+export type RestoreResult = 'restored' | 'not_found' | 'cancelled' | 'failed';
+
 /** 광고 제거 결제 시작 */
-export async function purchaseNoAds(): Promise<void> {
-  if (!isNative()) return;
+export async function purchaseNoAds(): Promise<PurchaseResult> {
+  if (!isNative()) return 'failed';
   const offer = CdvPurchase.store.get(PRODUCT_ID)?.getOffer();
   if (!offer) {
     console.warn('[IAP] offer not loaded yet');
-    return;
+    return 'failed';
   }
   const err = await offer.order();
   if (err) {
+    if (err.code === CdvPurchase.ErrorCode.PAYMENT_CANCELLED) {
+      return 'cancelled';
+    }
     console.warn('[IAP] order failed', err.message);
+    return 'failed';
   }
+
+  return 'started';
 }
 
 /** 기존 구매 복원 */
-export async function restorePurchases(): Promise<void> {
-  if (!isNative()) return;
+export async function restorePurchases(): Promise<RestoreResult> {
+  if (!isNative()) return 'failed';
+  if (typeof CdvPurchase === 'undefined') {
+    console.warn('[IAP] CdvPurchase is not available');
+    return 'failed';
+  }
   if (restoreInFlight) {
     return restoreInFlight;
   }
 
+  const wasOwned = CdvPurchase.store.owned(PRODUCT_ID);
   restoreInFlight = CdvPurchase.store.restorePurchases()
     .then((err) => {
-      // cancel(IAPError code 6778001)은 정상 흐름으로 처리
-      if (err && err.code !== CdvPurchase.ErrorCode.PAYMENT_CANCELLED) {
-        console.warn('[IAP] restorePurchases error', err.message);
+      syncAdRemovedState();
+
+      if (err?.code === CdvPurchase.ErrorCode.PAYMENT_CANCELLED) {
+        return 'cancelled' as const;
       }
+      if (err) {
+        console.warn('[IAP] restorePurchases error', err.message);
+        return 'failed' as const;
+      }
+
+      const isOwned = CdvPurchase.store.owned(PRODUCT_ID);
+      if (isOwned && !wasOwned) {
+        return 'restored' as const;
+      }
+      if (isOwned) {
+        return 'restored' as const;
+      }
+
+      return 'not_found' as const;
     })
     .finally(() => {
       restoreInFlight = null;
     });
 
-  await restoreInFlight;
+  return restoreInFlight;
 }

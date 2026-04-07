@@ -26,6 +26,7 @@ export function Settings() {
   const { adRemoved } = useSettingsStore();
 
   const [iapLoading, setIapLoading] = useState(false);
+  const [iapFeedback, setIapFeedback] = useState<string | null>(null);
   const [showDiagnosisResetConfirm, setShowDiagnosisResetConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [nickname, setNicknameLocal] = useState(profile?.nickname ?? '');
@@ -52,18 +53,38 @@ export function Settings() {
 
   const handlePurchaseNoAds = async () => {
     setIapLoading(true);
-    await purchaseNoAds();
-    setIapLoading(false);
+    setIapFeedback(null);
+    try {
+      const result = await purchaseNoAds();
+      if (result === 'cancelled') {
+        setIapFeedback('구매가 취소되었습니다.');
+      } else if (result === 'failed') {
+        setIapFeedback('구매 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+    } finally {
+      setIapLoading(false);
+    }
   };
 
   const handleRestorePurchases = async () => {
     setIapLoading(true);
+    setIapFeedback(null);
     try {
-      await restorePurchases();
+      const result = await restorePurchases();
+      if (result === 'restored') {
+        setIapFeedback('구매가 복원되었습니다. 광고가 제거됩니다.');
+      } else if (result === 'not_found') {
+        setIapFeedback('복원할 구매 내역이 없습니다.');
+      } else if (result === 'cancelled') {
+        setIapFeedback('복원이 취소되었습니다.');
+      } else {
+        setIapFeedback('구매 복원 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      }
     } catch {
-      // ignored
+      setIapFeedback('구매 복원 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIapLoading(false);
     }
-    setIapLoading(false);
   };
 
   const handleResetData = () => {
@@ -206,6 +227,11 @@ export function Settings() {
               >
                 구매 복원
               </button>
+              {iapFeedback && (
+                <p className="mt-3 text-center text-sm text-gray-500">
+                  {iapFeedback}
+                </p>
+              )}
             </motion.div>
           )}
 

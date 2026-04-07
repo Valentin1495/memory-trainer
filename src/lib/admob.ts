@@ -67,6 +67,10 @@ export async function requestTrackingPermission(): Promise<void> {
 
 async function loadInterstitial(): Promise<void> {
   if (!isNative() || loadingInterstitial) return;
+  if (useSettingsStore.getState().adRemoved) {
+    interstitialReady = false;
+    return;
+  }
   loadingInterstitial = true;
   try {
     await AdMob.prepareInterstitial({ adId: getInterstitialAdId() });
@@ -82,6 +86,10 @@ async function loadInterstitial(): Promise<void> {
 /** Dashboard에서 호출: 기존 사용자 ATT 처리 + 광고 로딩 */
 export async function initAdMob(): Promise<void> {
   if (!isNative()) return;
+  if (useSettingsStore.getState().adRemoved) {
+    interstitialReady = false;
+    return;
+  }
   await ensureAdMobInitialized();
   await ensureTrackingAuthorization(); // 온보딩을 건너뛴 기존 사용자 대응
   await loadInterstitial();
@@ -121,6 +129,7 @@ export async function showInterstitialAd(): Promise<void> {
 }
 
 export async function showInterstitialAdThrottled(): Promise<void> {
+  if (useSettingsStore.getState().adRemoved) return;
   sessionsSinceLastAd++;
   if (sessionsSinceLastAd < AD_FREQUENCY) return;
 
