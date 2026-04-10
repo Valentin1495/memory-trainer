@@ -28,3 +28,4 @@ ios/App/build
 android/keystore.properties
 android/*.jks
 android/*.keystore
+.granite

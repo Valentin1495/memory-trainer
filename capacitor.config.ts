@@ -14,7 +14,7 @@ const isLiveReloadEnabled =
 const config: CapacitorConfig = {
   appId: 'com.memorychallenge.app',
   appName: installAppName,
-  webDir: 'dist',
+  webDir: 'dist/web',
   ...(isLiveReloadEnabled
     ? {
       server: {

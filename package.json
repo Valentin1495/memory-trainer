@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "granite dev",
+    "build": "ait build",
     "lint": "eslint .",
     "preview": "vite preview",
     "postinstall": "patch-package",
@@ -14,9 +14,11 @@
     "cap:ios:dev": "CAP_LIVE_RELOAD=1 npx cap sync ios && npx cap open ios",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
     "cap:android:dev": "CAP_LIVE_RELOAD=1 npx cap sync android && npx cap open android",
-    "cap:android": "npm run build && npx cap sync android && npx cap open android"
+    "cap:android": "npm run build && npx cap sync android && npx cap open android",
+    "deploy": "ait deploy"
   },
   "dependencies": {
+    "@apps-in-toss/web-framework": "^2.4.3",
     "@capacitor-community/admob": "^8.0.0",
     "@capacitor/android": "^8.1.0",
     "@capacitor/cli": "^8.1.0",

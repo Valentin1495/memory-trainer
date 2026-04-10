@@ -9,7 +9,7 @@ import { SessionResult } from './pages/SessionResult';
 import { Report } from './pages/Report';
 import { Settings } from './pages/Settings';
 import { useUserProfileStore } from './store/userProfileStore';
-import { warmUpAdMob } from './lib/admob';
+import { warmUpAdMob } from './lib/ads';
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const isOnboarded = useUserProfileStore(s => s.isOnboarded);

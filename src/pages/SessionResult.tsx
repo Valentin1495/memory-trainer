@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useRecommendation } from '../hooks/useRecommendation';
 import { getFeedbackMessage } from '../lib/recommendation';
-import { showInterstitialAdThrottled } from '../lib/admob';
+import { showInterstitialAdThrottled } from '../lib/ads';
 import { useGameStore } from '../store/gameStore';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { DIFFICULTY_CONFIG } from '../types';

@@ -7,7 +7,7 @@ import { flushSync } from 'react-dom';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { useGameStore } from '../store/gameStore';
 import { getGuestId } from '../lib/supabase';
-import { requestTrackingPermission } from '../lib/admob';
+import { requestTrackingPermission } from '../lib/ads';
 import type { TrainingGoal } from '../types/training';
 
 const GOALS: { id: TrainingGoal; label: string; desc: string; icon: string }[] = [

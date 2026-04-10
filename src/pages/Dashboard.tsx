@@ -14,7 +14,7 @@ import { TRAINING_REGISTRY } from '../training/registry';
 import type { TrainingModuleDefinition } from '../types/training';
 import type { Difficulty, GameMode } from '../types';
 import { initIAP, purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
-import { initAdMob } from '../lib/admob';
+import { initAdMob } from '../lib/ads';
 
 function getDayLabels(): string[] {
   const labels = ['일', '월', '화', '수', '목', '금', '토'];
