@@ -10,8 +10,9 @@ import {
 
 export const TOSS_INTERSTITIAL_AD_GROUP_ID = 'ait-ad-test-interstitial-id';
 
-const AD_FREQUENCY = 3;
-const AD_COOLDOWN_MS = 3 * 60 * 1000;
+// 테스트 편의를 위해 결과 화면 진입 시 바로 광고 시도
+const AD_FREQUENCY = 1;
+const AD_COOLDOWN_MS = 0;
 
 let sessionsSinceLastAd = 0;
 let lastAdShownAt: number | null = null;

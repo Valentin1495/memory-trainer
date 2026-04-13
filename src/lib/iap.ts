@@ -13,6 +13,25 @@ let restoreInFlight: Promise<RestoreResult> | null = null;
 
 let cachedNoAdsPrice: string | undefined;
 let tossIapSupported = false;
+let tossNoAdsSku: string | undefined;
+
+type TossProductItem = {
+  sku: string;
+  displayAmount: string;
+  type?: string;
+};
+
+type TossPendingOrder = {
+  orderId: string;
+  sku?: string;
+};
+
+type TossCompletedOrder = {
+  orderId: string;
+  sku?: string;
+  status: 'COMPLETED' | 'REFUNDED';
+  date?: string;
+};
 
 function isNative(): boolean {
   return Capacitor.isNativePlatform();
@@ -25,11 +44,75 @@ function getIapProvider(): 'toss' | 'native' | 'none' {
 }
 
 function isNoAdsSku(value: string | undefined): boolean {
-  return typeof value === 'string' && value === PRODUCT_ID;
+  if (typeof value !== 'string') return false;
+  if (value === PRODUCT_ID) return true;
+  return typeof tossNoAdsSku === 'string' && value === tossNoAdsSku;
 }
 
 function setAdRemoved(value: boolean): void {
   useSettingsStore.getState().setAdRemoved(value);
+}
+
+function isGrantSuccess(result: boolean | undefined): boolean {
+  // 문서 기준으로 지급 완료 성공은 true일 때만 인정한다.
+  return result === true;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`timeout:${timeoutMs}`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+async function completeProductGrantWithRetry(
+  orderId: string,
+  maxAttempts = 3,
+  attemptTimeoutMs = 7_000,
+): Promise<boolean> {
+  let lastResult: boolean | undefined = false;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const granted = await withTimeout(
+        IAP.completeProductGrant({ params: { orderId } }),
+        attemptTimeoutMs,
+      );
+      lastResult = granted;
+      if (isGrantSuccess(granted)) {
+        return true;
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn('[IAP] completeProductGrant attempt failed', { orderId, attempt, attemptTimeoutMs, error });
+    }
+
+    if (attempt < maxAttempts) {
+      await wait(200 * attempt);
+    }
+  }
+
+  if (lastError) {
+    console.warn('[IAP] completeProductGrant failed after retries', { orderId, maxAttempts, lastError });
+  } else {
+    console.warn('[IAP] completeProductGrant returned explicit failure after retries', { orderId, maxAttempts, lastResult });
+  }
+  return false;
 }
 
 function syncAdRemovedStateFromNative(): void {
@@ -54,21 +137,105 @@ async function detectTossIapSupport(): Promise<boolean> {
   }
 }
 
-function cacheNoAdsPriceFromTossProducts(products: { products: Array<{ sku: string; displayAmount: string }> }): void {
-  const target = products.products.find((item) => isNoAdsSku(item.sku));
+function pickNoAdsProduct(products: TossProductItem[]): TossProductItem | undefined {
+  const byEnvId = products.find((item) => item.sku === PRODUCT_ID);
+  if (byEnvId) return byEnvId;
+
+  // 토스에서 실제 내려온 SKU를 우선 사용하고, 비소모품을 우선 선택
+  const nonConsumable = products.find((item) => item.type === 'NON_CONSUMABLE');
+  if (nonConsumable) return nonConsumable;
+
+  return products[0];
+}
+
+function cacheNoAdsProductFromTossProducts(products: { products: TossProductItem[] }): void {
+  const target = pickNoAdsProduct(products.products);
+  tossNoAdsSku = target?.sku;
   cachedNoAdsPrice = target?.displayAmount;
+}
+
+async function ensureTossNoAdsSku(): Promise<string | undefined> {
+  if (tossNoAdsSku) return tossNoAdsSku;
+
+  try {
+    const products = await IAP.getProductItemList();
+    if (products) {
+      cacheNoAdsProductFromTossProducts(products as { products: TossProductItem[] });
+    }
+  } catch (error) {
+    console.warn('[IAP] getProductItemList failed while resolving toss sku', error);
+  }
+
+  return tossNoAdsSku;
+}
+
+function getOrderDateMs(order: TossCompletedOrder): number {
+  if (!order.date) return Number.NEGATIVE_INFINITY;
+  const timestamp = Date.parse(order.date);
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+}
+
+function pickLatestOrder(current: TossCompletedOrder | null, candidate: TossCompletedOrder): TossCompletedOrder {
+  if (!current) return candidate;
+
+  const currentDate = getOrderDateMs(current);
+  const candidateDate = getOrderDateMs(candidate);
+
+  if (candidateDate > currentDate) return candidate;
+  return current;
+}
+
+async function getPendingNoAdsOrders(): Promise<TossPendingOrder[]> {
+  const pending = await IAP.getPendingOrders();
+  return (pending?.orders ?? []).filter((order) => isNoAdsSku(order.sku));
+}
+
+async function getLatestNoAdsCompletedOrRefundedOrder(): Promise<TossCompletedOrder | null> {
+  // SDK 타입 선언 버전 차이 호환:
+  // - 일부 타입 선언: getCompletedOrRefundedOrders(): Promise<...>
+  // - 최신 문서/런타임: getCompletedOrRefundedOrders({ key? })
+  const getCompletedOrRefundedOrdersCompat =
+    IAP.getCompletedOrRefundedOrders as unknown as (params?: { key?: string | null }) => Promise<{
+      hasNext?: boolean;
+      nextKey?: string | null;
+      orders?: TossCompletedOrder[];
+    } | undefined>;
+
+  const seenKeys = new Set<string>();
+  let key: string | null | undefined = undefined;
+  let latest: TossCompletedOrder | null = null;
+
+  while (true) {
+    const page = await getCompletedOrRefundedOrdersCompat(key ? { key } : undefined);
+    const orders = page?.orders ?? [];
+    const targetOrders = orders.filter((order) => isNoAdsSku(order.sku));
+
+    for (const order of targetOrders) {
+      latest = pickLatestOrder(latest, order);
+    }
+
+    const nextKey = page?.nextKey;
+    if (!page?.hasNext || !nextKey) break;
+    if (seenKeys.has(nextKey)) break;
+
+    seenKeys.add(nextKey);
+    key = nextKey;
+  }
+
+  return latest;
 }
 
 async function syncAdRemovedStateFromTossOrders(): Promise<void> {
   try {
-    const pending = await IAP.getPendingOrders();
-    const targetPendingOrders = pending.orders.filter((order) => isNoAdsSku(order.sku));
+    const targetPendingOrders = await getPendingNoAdsOrders();
 
     if (targetPendingOrders.length > 0) {
       for (const order of targetPendingOrders) {
         try {
-          await IAP.completeProductGrant({ params: { orderId: order.orderId } });
-          setAdRemoved(true);
+          const granted = await completeProductGrantWithRetry(order.orderId);
+          if (granted) {
+            setAdRemoved(true);
+          }
         } catch (error) {
           console.warn('[IAP] completeProductGrant failed during init', error);
         }
@@ -79,12 +246,9 @@ async function syncAdRemovedStateFromTossOrders(): Promise<void> {
   }
 
   try {
-    const completedOrRefunded = await IAP.getCompletedOrRefundedOrders();
-    const targetOrders = completedOrRefunded.orders.filter((order) => isNoAdsSku(order.sku));
-    if (targetOrders.length === 0) return;
+    const latest = await getLatestNoAdsCompletedOrRefundedOrder();
+    if (!latest) return;
 
-    // 최신 상태를 우선 적용
-    const latest = targetOrders[targetOrders.length - 1];
     if (latest.status === 'COMPLETED') {
       setAdRemoved(true);
     } else if (latest.status === 'REFUNDED') {
@@ -141,7 +305,7 @@ async function initTossIap(): Promise<void> {
   try {
     const products = await IAP.getProductItemList();
     if (products) {
-      cacheNoAdsPriceFromTossProducts(products);
+      cacheNoAdsProductFromTossProducts(products as { products: TossProductItem[] });
     }
   } catch (error) {
     console.warn('[IAP] getProductItemList failed during init', error);
@@ -218,6 +382,12 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
   }
 
   if (provider === 'toss') {
+    const tossSku = await ensureTossNoAdsSku();
+    if (!tossSku) {
+      console.warn('[IAP] toss sku is not available from getProductItemList');
+      return 'failed';
+    }
+
     return await new Promise<PurchaseResult>((resolve) => {
       let done = false;
       const finish = (result: PurchaseResult) => {
@@ -231,14 +401,23 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
       try {
         cleanup = IAP.createOneTimePurchaseOrder({
           options: {
-            sku: PRODUCT_ID,
+            sku: tossSku,
             processProductGrant: async ({ orderId }) => {
+              const startedAt = Date.now();
+              console.info('[IAP] processProductGrant started', { orderId });
               try {
-                setAdRemoved(true);
-                await IAP.completeProductGrant({ params: { orderId } });
-                return true;
+                const granted = await completeProductGrantWithRetry(orderId, 3, 7_000);
+                const elapsedMs = Date.now() - startedAt;
+                if (granted) {
+                  setAdRemoved(true);
+                  console.info('[IAP] processProductGrant succeeded', { orderId, elapsedMs });
+                  return true;
+                }
+                console.warn('[IAP] processProductGrant failed', { orderId, elapsedMs });
+                return false;
               } catch (error) {
-                console.warn('[IAP] completeProductGrant failed in purchase flow', error);
+                const elapsedMs = Date.now() - startedAt;
+                console.warn('[IAP] processProductGrant threw', { orderId, elapsedMs, error });
                 return false;
               }
             },
@@ -253,7 +432,7 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
           onError: (error: unknown) => {
             const code = (error as { code?: string })?.code;
             cleanup?.();
-            if (code === 'USER_CANCELED') {
+            if (code === 'USER_CANCELED' || code === 'USER_CANCELLED') {
               finish('cancelled');
               return;
             }
@@ -319,24 +498,31 @@ export async function restorePurchases(): Promise<RestoreResult> {
 
   if (provider === 'toss') {
     try {
-      const pending = await IAP.getPendingOrders();
-      const targetPendingOrders = pending.orders.filter((order) => isNoAdsSku(order.sku));
+      const targetPendingOrders = await getPendingNoAdsOrders();
 
       if (targetPendingOrders.length > 0) {
+        let grantedAny = false;
+
         for (const order of targetPendingOrders) {
-          await IAP.completeProductGrant({ params: { orderId: order.orderId } });
+          const granted = await completeProductGrantWithRetry(order.orderId);
+          if (granted) {
+            grantedAny = true;
+          }
         }
-        setAdRemoved(true);
-        return 'restored';
+
+        if (grantedAny) {
+          setAdRemoved(true);
+          return 'restored';
+        }
+
+        return 'failed';
       }
 
-      const completedOrRefunded = await IAP.getCompletedOrRefundedOrders();
-      const targetOrders = completedOrRefunded.orders.filter((order) => isNoAdsSku(order.sku));
-      if (targetOrders.length === 0) {
+      const latest = await getLatestNoAdsCompletedOrRefundedOrder();
+      if (!latest) {
         return 'not_found';
       }
 
-      const latest = targetOrders[targetOrders.length - 1];
       if (latest.status === 'COMPLETED') {
         setAdRemoved(true);
         return 'restored';

@@ -15,9 +15,9 @@ function getInterstitialAdId(): string {
 
 let interstitialReady = false;
 let loadingInterstitial = false;
-const AD_FREQUENCY = 3;
+const AD_FREQUENCY = 1;
 let sessionsSinceLastAd = 0;
-const AD_COOLDOWN_MS = 3 * 60 * 1000; // 3분
+const AD_COOLDOWN_MS = 0; // 테스트 편의: 쿨다운 제거
 let lastAdShownAt: number | null = null;
 
 // AdMob.initialize()는 ATT API 호출 전에 반드시 완료되어야 함 (실기기)

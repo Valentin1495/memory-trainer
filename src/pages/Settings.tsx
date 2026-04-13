@@ -23,7 +23,7 @@ export function Settings() {
   const { profile, updateGoal, updateDailyGoal, resetDiagnosis, resetProfile } = useUserProfileStore();
   const { clearHistory } = useHistoryStore();
   const { setNickname } = useGameStore();
-  const { adRemoved } = useSettingsStore();
+  const { adRemoved, setAdRemoved } = useSettingsStore();
 
   const [iapLoading, setIapLoading] = useState(false);
   const [iapFeedback, setIapFeedback] = useState<string | null>(null);
@@ -85,6 +85,11 @@ export function Settings() {
     } finally {
       setIapLoading(false);
     }
+  };
+
+  const handleResetNoAdsForTesting = () => {
+    setAdRemoved(false);
+    setIapFeedback('테스트용으로 광고 제거 상태를 초기화했어요.');
   };
 
   const handleResetData = () => {
@@ -232,6 +237,23 @@ export function Settings() {
                   {iapFeedback}
                 </p>
               )}
+            </motion.div>
+          )}
+
+          {import.meta.env.DEV && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="rounded-2xl border border-amber-200 bg-amber-50 p-5"
+            >
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-amber-500">개발용</p>
+              <button
+                onClick={handleResetNoAdsForTesting}
+                className="w-full rounded-xl border border-amber-300 bg-white py-3 text-sm font-semibold text-amber-700"
+              >
+                광고 제거 상태 초기화
+              </button>
             </motion.div>
           )}
 
