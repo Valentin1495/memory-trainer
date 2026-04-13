@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUserProfileStore } from '../store/userProfileStore';
@@ -13,7 +13,7 @@ import { MiniHeatmap } from '../components/dashboard/MiniHeatmap';
 import { TRAINING_REGISTRY } from '../training/registry';
 import type { TrainingModuleDefinition } from '../types/training';
 import type { Difficulty, GameMode } from '../types';
-import { initIAP, purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
+import { initIAP, purchaseNoAds, restorePurchases, getNoAdsPrice, getLastIapErrorCode } from '../lib/iap';
 import { initAdMob } from '../lib/ads';
 
 function getDayLabels(): string[] {
@@ -27,6 +27,21 @@ function getDayLabels(): string[] {
   }
 
   return result;
+}
+
+function getIapFailureMessage(errorCode?: string): string {
+  switch (errorCode) {
+    case 'TOSS_SERVER_VERIFICATION_FAILED':
+      return '결제는 완료됐지만 서버 확인이 지연됐어요. 앱을 다시 열고 구매 복원을 눌러주세요.';
+    case 'PRODUCT_NOT_GRANTED_BY_PARTNER':
+      return '결제 후 상품 지급에 실패했어요. 구매 복원을 시도해 주세요.';
+    case 'SKU_NOT_AVAILABLE':
+      return '상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+    case 'OFFER_NOT_READY':
+      return '결제 준비 중이에요. 잠시 후 다시 시도해 주세요.';
+    default:
+      return '구매 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+  }
 }
 
 export function Dashboard() {
@@ -45,7 +60,19 @@ export function Dashboard() {
   const [selectedMod, setSelectedMod] = useState<TrainingModuleDefinition | null>(null);
   const [pickedDifficulty, setPickedDifficulty] = useState<Difficulty>('medium');
   const [pickedMode, setPickedMode] = useState<GameMode>('basic');
+  const iapSheetBlockedUntilRef = useRef(0);
   const showDiagnosisBanner = profile?.diagnosisDeferred === true && !profile?.diagnosisComplete;
+
+  const closeIapSheet = () => {
+    iapSheetBlockedUntilRef.current = Date.now() + 600;
+    setShowIapSheet(false);
+  };
+
+  const openIapSheet = () => {
+    if (Date.now() < iapSheetBlockedUntilRef.current) return;
+    setIapFeedback(null);
+    setShowIapSheet(true);
+  };
 
   useEffect(() => {
     initAdMob();
@@ -54,7 +81,7 @@ export function Dashboard() {
 
   useEffect(() => {
     if (adRemoved) {
-      setShowIapSheet(false);
+      closeIapSheet();
       setIapFeedback('구매가 완료되었습니다. 광고가 제거됩니다.');
     }
   }, [adRemoved]);
@@ -101,9 +128,9 @@ export function Dashboard() {
     try {
       const result = await purchaseNoAds();
       if (result === 'cancelled') {
-        setIapFeedback('구매가 취소되었습니다.');
+        setIapFeedback('결제를 취소했어요. 실제 청구는 발생하지 않았어요.');
       } else if (result === 'failed') {
-        setIapFeedback('구매 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        setIapFeedback(getIapFailureMessage(getLastIapErrorCode()));
       }
     } finally {
       setIapLoading(false);
@@ -115,7 +142,7 @@ export function Dashboard() {
     try {
       const result = await restorePurchases();
       if (result === 'restored') {
-        setShowIapSheet(false);
+        closeIapSheet();
         setIapFeedback('구매가 복원되었습니다. 광고가 제거됩니다.');
       } else if (result === 'not_found') {
         setIapFeedback('복원할 구매 내역이 없습니다.');
@@ -240,7 +267,7 @@ export function Dashboard() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-30 bg-black/40"
-              onClick={() => setShowIapSheet(false)}
+              onClick={closeIapSheet}
             />
             <motion.div
               initial={{ y: '100%' }}
@@ -273,6 +300,9 @@ export function Dashboard() {
                   {iapFeedback}
                 </p>
               )}
+              <p className="mt-2 text-center text-xs text-gray-400">
+                결제 완료 후 오류가 보이면 앱을 다시 열어 구매 복원을 실행해 주세요.
+              </p>
             </motion.div>
           </>
         )}
@@ -405,10 +435,7 @@ export function Dashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            onClick={() => {
-              setIapFeedback(null);
-              setShowIapSheet(true);
-            }}
+            onClick={openIapSheet}
             className="mt-4 w-full rounded-xl bg-white/10 py-3 text-xs text-white/60 transition-colors hover:bg-white/20"
           >
             광고 없이 이용하기

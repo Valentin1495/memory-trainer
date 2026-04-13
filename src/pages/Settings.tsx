@@ -6,7 +6,7 @@ import { useUserProfileStore } from '../store/userProfileStore';
 import { useHistoryStore } from '../store/historyStore';
 import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { purchaseNoAds, restorePurchases, getNoAdsPrice } from '../lib/iap';
+import { purchaseNoAds, restorePurchases, getNoAdsPrice, getLastIapErrorCode, inspectNoAdsOrderStatus } from '../lib/iap';
 import { getUserLevelSummary } from '../lib/recommendation';
 import type { TrainingGoal } from '../types/training';
 
@@ -17,6 +17,38 @@ const GOAL_LABELS: Record<TrainingGoal, string> = {
 };
 
 const DAILY_GOAL_OPTIONS = [1, 3, 5];
+
+function getIapFailureMessage(errorCode?: string): string {
+  switch (errorCode) {
+    case 'TOSS_SERVER_VERIFICATION_FAILED':
+      return '결제는 완료됐지만 서버 확인이 지연됐어요. 앱을 다시 열고 구매 복원을 눌러주세요.';
+    case 'PRODUCT_NOT_GRANTED_BY_PARTNER':
+      return '결제 후 상품 지급에 실패했어요. 구매 복원을 시도해 주세요.';
+    case 'SKU_NOT_AVAILABLE':
+      return '상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+    case 'OFFER_NOT_READY':
+      return '결제 준비 중이에요. 잠시 후 다시 시도해 주세요.';
+    default:
+      return '구매 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+  }
+}
+
+function getOrderStatusMessage(status: Awaited<ReturnType<typeof inspectNoAdsOrderStatus>>): string {
+  switch (status.status) {
+    case 'owned':
+      return '주문 상태 점검: 구매 완료(네이티브 스토어 소유 상태)';
+    case 'pending':
+      return `주문 상태 점검: 지급 대기 주문이 있어요 (${status.orderId ?? 'orderId 없음'})`;
+    case 'completed':
+      return `주문 상태 점검: 완료 주문이에요 (${status.orderId ?? 'orderId 없음'})`;
+    case 'refunded':
+      return `주문 상태 점검: 환불된 주문이에요 (${status.orderId ?? 'orderId 없음'})`;
+    case 'not_found':
+      return '주문 상태 점검: 조회된 주문이 없어요.';
+    default:
+      return `주문 상태 점검 중 오류가 발생했어요${status.errorCode ? ` (${status.errorCode})` : ''}.`;
+  }
+}
 
 export function Settings() {
   const navigate = useNavigate();
@@ -57,9 +89,9 @@ export function Settings() {
     try {
       const result = await purchaseNoAds();
       if (result === 'cancelled') {
-        setIapFeedback('구매가 취소되었습니다.');
+        setIapFeedback('결제를 취소했어요. 실제 청구는 발생하지 않았어요.');
       } else if (result === 'failed') {
-        setIapFeedback('구매 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        setIapFeedback(getIapFailureMessage(getLastIapErrorCode()));
       }
     } finally {
       setIapLoading(false);
@@ -90,6 +122,20 @@ export function Settings() {
   const handleResetNoAdsForTesting = () => {
     setAdRemoved(false);
     setIapFeedback('테스트용으로 광고 제거 상태를 초기화했어요.');
+  };
+
+  const handleInspectNoAdsOrderStatus = async () => {
+    setIapLoading(true);
+    try {
+      const status = await inspectNoAdsOrderStatus();
+      console.info('[IAP] inspectNoAdsOrderStatus', status);
+      setIapFeedback(getOrderStatusMessage(status));
+    } catch (error) {
+      console.warn('[IAP] inspectNoAdsOrderStatus failed', error);
+      setIapFeedback('주문 상태 점검 중 문제가 발생했어요.');
+    } finally {
+      setIapLoading(false);
+    }
   };
 
   const handleResetData = () => {
@@ -237,6 +283,9 @@ export function Settings() {
                   {iapFeedback}
                 </p>
               )}
+              <p className="mt-2 text-xs text-gray-400">
+                결제 취소는 즉시 취소 처리되며, 결제 완료 후 오류 시에는 구매 복원으로 다시 지급할 수 있어요.
+              </p>
             </motion.div>
           )}
 
@@ -253,6 +302,13 @@ export function Settings() {
                 className="w-full rounded-xl border border-amber-300 bg-white py-3 text-sm font-semibold text-amber-700"
               >
                 광고 제거 상태 초기화
+              </button>
+              <button
+                onClick={handleInspectNoAdsOrderStatus}
+                disabled={iapLoading}
+                className="mt-2 w-full rounded-xl border border-amber-300 bg-white py-3 text-sm font-semibold text-amber-700 disabled:opacity-60"
+              >
+                주문 상태 점검
               </button>
             </motion.div>
           )}

@@ -13,11 +13,28 @@ function getInterstitialAdId(): string {
   return import.meta.env.VITE_ADMOB_INTERSTITIAL_ID_ANDROID ?? '';
 }
 
+function readIntEnv(name: string, fallback: number, minValue = 0): number {
+  const rawValue = (import.meta.env as Record<string, unknown>)[name];
+  if (typeof rawValue !== 'string') return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return fallback;
+  const normalized = Math.floor(parsed);
+  return normalized >= minValue ? normalized : fallback;
+}
+
 let interstitialReady = false;
 let loadingInterstitial = false;
-const AD_FREQUENCY = 1;
+const AD_FREQUENCY = readIntEnv(
+  'VITE_AD_INTERSTITIAL_FREQUENCY',
+  import.meta.env.DEV ? 1 : 3,
+  1,
+);
 let sessionsSinceLastAd = 0;
-const AD_COOLDOWN_MS = 0; // 테스트 편의: 쿨다운 제거
+const AD_COOLDOWN_MS = readIntEnv(
+  'VITE_AD_INTERSTITIAL_COOLDOWN_MS',
+  import.meta.env.DEV ? 0 : 180_000,
+  0,
+);
 let lastAdShownAt: number | null = null;
 
 // AdMob.initialize()는 ATT API 호출 전에 반드시 완료되어야 함 (실기기)

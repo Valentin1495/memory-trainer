@@ -14,6 +14,9 @@ let restoreInFlight: Promise<RestoreResult> | null = null;
 let cachedNoAdsPrice: string | undefined;
 let tossIapSupported = false;
 let tossNoAdsSku: string | undefined;
+let lastIapErrorCode: string | undefined;
+const KNOWN_TOSS_NO_ADS_ORDER_IDS_KEY = 'memory-trainer:iap:known-toss-no-ads-order-ids';
+const knownTossNoAdsOrderIds = new Set<string>();
 
 type TossProductItem = {
   sku: string;
@@ -33,6 +36,47 @@ type TossCompletedOrder = {
   date?: string;
 };
 
+function loadKnownNoAdsOrderIds(): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const raw = window.localStorage.getItem(KNOWN_TOSS_NO_ADS_ORDER_IDS_KEY);
+    if (!raw) return;
+    const values = JSON.parse(raw) as string[];
+    if (!Array.isArray(values)) return;
+    values.forEach((value) => {
+      if (typeof value === 'string' && value.length > 0) {
+        knownTossNoAdsOrderIds.add(value);
+      }
+    });
+  } catch (error) {
+    console.warn('[IAP] failed to load known no-ads order ids', error);
+  }
+}
+
+function persistKnownNoAdsOrderIds(): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.setItem(
+      KNOWN_TOSS_NO_ADS_ORDER_IDS_KEY,
+      JSON.stringify(Array.from(knownTossNoAdsOrderIds)),
+    );
+  } catch (error) {
+    console.warn('[IAP] failed to persist known no-ads order ids', error);
+  }
+}
+
+function rememberKnownNoAdsOrderId(orderId: string | undefined): void {
+  if (!orderId) return;
+  if (knownTossNoAdsOrderIds.has(orderId)) return;
+  knownTossNoAdsOrderIds.add(orderId);
+  persistKnownNoAdsOrderIds();
+}
+
+function isKnownNoAdsOrderId(orderId: string | undefined): boolean {
+  if (!orderId) return false;
+  return knownTossNoAdsOrderIds.has(orderId);
+}
+
 function isNative(): boolean {
   return Capacitor.isNativePlatform();
 }
@@ -47,6 +91,12 @@ function isNoAdsSku(value: string | undefined): boolean {
   if (typeof value !== 'string') return false;
   if (value === PRODUCT_ID) return true;
   return typeof tossNoAdsSku === 'string' && value === tossNoAdsSku;
+}
+
+function isNoAdsOrder(order: { orderId?: string; sku?: string }): boolean {
+  if (isNoAdsSku(order.sku)) return true;
+  if (isKnownNoAdsOrderId(order.orderId)) return true;
+  return false;
 }
 
 function setAdRemoved(value: boolean): void {
@@ -187,7 +237,29 @@ function pickLatestOrder(current: TossCompletedOrder | null, candidate: TossComp
 
 async function getPendingNoAdsOrders(): Promise<TossPendingOrder[]> {
   const pending = await IAP.getPendingOrders();
-  return (pending?.orders ?? []).filter((order) => isNoAdsSku(order.sku));
+  const allOrders = pending?.orders ?? [];
+  const matched = allOrders.filter((order) => isNoAdsOrder(order));
+
+  if (matched.length > 0) {
+    console.info('[IAP] getPendingOrders matched no-ads orders', {
+      allCount: allOrders.length,
+      matchedCount: matched.length,
+    });
+    return matched;
+  }
+
+  if (allOrders.length === 1) {
+    console.warn('[IAP] getPendingOrders fallback to single order (sku missing or unmatched)', {
+      orderId: allOrders[0]?.orderId,
+      sku: allOrders[0]?.sku,
+    });
+    return allOrders;
+  }
+
+  console.info('[IAP] getPendingOrders no matching no-ads order', {
+    allCount: allOrders.length,
+  });
+  return [];
 }
 
 async function getLatestNoAdsCompletedOrRefundedOrder(): Promise<TossCompletedOrder | null> {
@@ -208,9 +280,19 @@ async function getLatestNoAdsCompletedOrRefundedOrder(): Promise<TossCompletedOr
   while (true) {
     const page = await getCompletedOrRefundedOrdersCompat(key ? { key } : undefined);
     const orders = page?.orders ?? [];
-    const targetOrders = orders.filter((order) => isNoAdsSku(order.sku));
+    let targetOrders = orders.filter((order) => isNoAdsOrder(order));
+
+    if (targetOrders.length === 0 && orders.length === 1) {
+      console.warn('[IAP] getCompletedOrRefundedOrders fallback to single order (sku missing or unmatched)', {
+        orderId: orders[0]?.orderId,
+        sku: orders[0]?.sku,
+        status: orders[0]?.status,
+      });
+      targetOrders = orders;
+    }
 
     for (const order of targetOrders) {
+      rememberKnownNoAdsOrderId(order.orderId);
       latest = pickLatestOrder(latest, order);
     }
 
@@ -320,6 +402,8 @@ export async function initIAP(): Promise<void> {
   }
 
   iapInitPromise = (async () => {
+    loadKnownNoAdsOrderIds();
+
     if (isNative()) {
       await initNativeIap();
       return;
@@ -355,16 +439,91 @@ export function getNoAdsPrice(): string | undefined {
 
 export type PurchaseResult = 'started' | 'cancelled' | 'failed';
 export type RestoreResult = 'restored' | 'not_found' | 'cancelled' | 'failed';
+export type NoAdsOrderStatusResult = {
+  provider: 'toss' | 'native' | 'none';
+  status: 'owned' | 'pending' | 'completed' | 'refunded' | 'not_found' | 'failed';
+  orderId?: string;
+  sku?: string;
+  source?: 'native_store' | 'pending_orders' | 'completed_or_refunded_orders';
+  errorCode?: string;
+};
+
+export function getLastIapErrorCode(): string | undefined {
+  return lastIapErrorCode;
+}
+
+export async function inspectNoAdsOrderStatus(): Promise<NoAdsOrderStatusResult> {
+  await initIAP();
+
+  const provider = getIapProvider();
+
+  if (provider === 'native') {
+    const owned = CdvPurchase?.store?.owned(PRODUCT_ID) === true;
+    return {
+      provider,
+      status: owned ? 'owned' : 'not_found',
+      sku: PRODUCT_ID,
+      source: 'native_store',
+    };
+  }
+
+  if (provider === 'toss') {
+    try {
+      const pendingOrders = await getPendingNoAdsOrders();
+      if (pendingOrders.length > 0) {
+        const latestPendingOrder = pendingOrders[0];
+        return {
+          provider,
+          status: 'pending',
+          orderId: latestPendingOrder.orderId,
+          sku: latestPendingOrder.sku,
+          source: 'pending_orders',
+        };
+      }
+
+      const latestOrder = await getLatestNoAdsCompletedOrRefundedOrder();
+      if (!latestOrder) {
+        return {
+          provider,
+          status: 'not_found',
+        };
+      }
+
+      return {
+        provider,
+        status: latestOrder.status === 'COMPLETED' ? 'completed' : 'refunded',
+        orderId: latestOrder.orderId,
+        sku: latestOrder.sku,
+        source: 'completed_or_refunded_orders',
+      };
+    } catch (error) {
+      console.warn('[IAP] inspectNoAdsOrderStatus failed', error);
+      return {
+        provider,
+        status: 'failed',
+        errorCode: lastIapErrorCode,
+      };
+    }
+  }
+
+  return {
+    provider,
+    status: 'failed',
+    errorCode: 'IAP_PROVIDER_NOT_AVAILABLE',
+  };
+}
 
 /** 광고 제거 결제 시작 */
 export async function purchaseNoAds(): Promise<PurchaseResult> {
   await initIAP();
+  lastIapErrorCode = undefined;
 
   const provider = getIapProvider();
 
   if (provider === 'native') {
     const offer = CdvPurchase?.store?.get(PRODUCT_ID)?.getOffer();
     if (!offer) {
+      lastIapErrorCode = 'OFFER_NOT_READY';
       console.warn('[IAP] offer not loaded yet');
       return 'failed';
     }
@@ -374,6 +533,7 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
       if (err.code === CdvPurchase.ErrorCode.PAYMENT_CANCELLED) {
         return 'cancelled';
       }
+      lastIapErrorCode = String(err.code);
       console.warn('[IAP] order failed', err.message);
       return 'failed';
     }
@@ -384,6 +544,7 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
   if (provider === 'toss') {
     const tossSku = await ensureTossNoAdsSku();
     if (!tossSku) {
+      lastIapErrorCode = 'SKU_NOT_AVAILABLE';
       console.warn('[IAP] toss sku is not available from getProductItemList');
       return 'failed';
     }
@@ -403,13 +564,13 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
           options: {
             sku: tossSku,
             processProductGrant: async ({ orderId }) => {
+              rememberKnownNoAdsOrderId(orderId);
               const startedAt = Date.now();
               console.info('[IAP] processProductGrant started', { orderId });
               try {
                 const granted = await completeProductGrantWithRetry(orderId, 3, 7_000);
                 const elapsedMs = Date.now() - startedAt;
                 if (granted) {
-                  setAdRemoved(true);
                   console.info('[IAP] processProductGrant succeeded', { orderId, elapsedMs });
                   return true;
                 }
@@ -423,24 +584,37 @@ export async function purchaseNoAds(): Promise<PurchaseResult> {
             },
           },
           onEvent: (event) => {
+            console.info('[IAP] createOneTimePurchaseOrder event', event);
             if (event.type === 'success') {
+              const data = (event as { data?: { orderId?: string; amount?: number; sku?: string } }).data;
+              rememberKnownNoAdsOrderId(data?.orderId);
+              console.info('[IAP] toss purchase success event', {
+                orderId: data?.orderId,
+                amount: data?.amount,
+                sku: data?.sku,
+              });
               setAdRemoved(true);
               cleanup?.();
               finish('started');
+              return;
             }
+            console.info('[IAP] toss purchase non-success event', { type: event.type });
           },
           onError: (error: unknown) => {
             const code = (error as { code?: string })?.code;
+            console.warn('[IAP] createOneTimePurchaseOrder onError', { code, error });
             cleanup?.();
             if (code === 'USER_CANCELED' || code === 'USER_CANCELLED') {
               finish('cancelled');
               return;
             }
+            lastIapErrorCode = code ?? 'TOSS_PURCHASE_FAILED';
             console.warn('[IAP] toss purchase failed', error);
             finish('failed');
           },
         });
       } catch (error) {
+        lastIapErrorCode = 'PURCHASE_FLOW_START_FAILED';
         console.warn('[IAP] createOneTimePurchaseOrder failed to start', error);
         finish('failed');
       }
