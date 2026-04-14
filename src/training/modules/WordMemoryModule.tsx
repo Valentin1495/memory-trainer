@@ -29,6 +29,7 @@ function HeartLifeIcon({ dimmed = false }: { dimmed?: boolean }) {
 export function WordMemoryModule({
   difficulty,
   mode = 'basic',
+  skipReadyScreen = false,
   isDiagnosis = false,
   diagnosisLabel,
   diagnosisColor,
@@ -193,7 +194,7 @@ export function WordMemoryModule({
             words={shownWords}
             wordDurationMs={config.wordDurationMs}
             difficulty={difficulty}
-            onComplete={() => setPhase('ready')}
+            onComplete={() => setPhase(skipReadyScreen ? 'choose' : 'ready')}
           />
         )}
 

@@ -1,5 +1,5 @@
 import { useEffect, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDiagnosis } from '../hooks/useDiagnosis';
 import { useGameStore } from '../store/gameStore';
@@ -30,11 +30,20 @@ const DIFFICULTY_COLOR: Record<Difficulty, string> = {
   hard: 'text-red-400',
 };
 
+function getSafeRedirectPath(raw: string | null) {
+  if (!raw) return '/';
+  return raw.startsWith('/') ? raw : '/';
+}
+
 export function Diagnosis() {
   const navigate = useNavigate();
+  const location = useLocation();
   const deferDiagnosis = useUserProfileStore(s => s.deferDiagnosis);
   const profileDifficulty = useUserProfileStore(s => s.profile?.currentDifficulty ?? 'easy');
   const baselineScore = useUserProfileStore(s => s.profile?.baselineScore ?? 0);
+  const redirectPath = getSafeRedirectPath(
+    new URLSearchParams(location.search).get('redirect')
+  );
   const { setDifficulty, setMode, startGame } = useGameStore();
   const {
     step,
@@ -62,12 +71,12 @@ export function Diagnosis() {
 
   const handleLater = () => {
     deferDiagnosis();
-    navigate('/', { replace: true });
+    navigate(redirectPath, { replace: true });
   };
 
   const handleCancelDiagnosis = () => {
     deferDiagnosis();
-    navigate('/', { replace: true });
+    navigate(redirectPath, { replace: true });
   };
 
   if (step === 'complete') {
@@ -141,7 +150,7 @@ export function Diagnosis() {
           </div>
 
           <motion.button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(redirectPath)}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"

@@ -39,6 +39,7 @@ export interface SessionRecord {
 export interface TrainingModuleProps {
   difficulty: Difficulty;
   mode?: string;
+  skipReadyScreen?: boolean;
   isDiagnosis?: boolean;
   diagnosisLabel?: string;
   diagnosisColor?: string;

@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { useHistoryStore } from '../store/historyStore';
 import { useRecommendation } from '../hooks/useRecommendation';
-import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useGame } from '../hooks/useGame';
 import { TodayTrainingCard } from '../components/dashboard/TodayTrainingCard';
@@ -51,7 +50,6 @@ export function Dashboard() {
   const getStreakDays = useHistoryStore(s => s.getStreakDays);
   const sessions = useHistoryStore(s => s.sessions);
   const recommendation = useRecommendation();
-  const { setDifficulty, startGame } = useGameStore();
   const { adRemoved } = useSettingsStore();
   const { isLoading } = useGame();
   const [showIapSheet, setShowIapSheet] = useState(false);
@@ -100,10 +98,14 @@ export function Dashboard() {
   }
 
   const handleStartTraining = useCallback(() => {
-    setDifficulty(recommendation.difficulty);
-    startGame();
-    navigate(`/training/${recommendation.moduleId}`);
-  }, [navigate, recommendation, setDifficulty, startGame]);
+    navigate(`/training/${recommendation.moduleId}`, {
+      state: {
+        autoStart: true,
+        initialDifficulty: recommendation.difficulty,
+        initialMode: 'basic',
+      },
+    });
+  }, [navigate, recommendation.difficulty, recommendation.moduleId]);
 
   const handleModuleCardClick = (mod: TrainingModuleDefinition) => {
     setPickedDifficulty(recommendation.difficulty);
@@ -114,12 +116,16 @@ export function Dashboard() {
   const handleStartSelected = () => {
     if (!selectedMod) return;
 
-    setDifficulty(pickedDifficulty);
-    const { setMode: setGameMode } = useGameStore.getState();
-    setGameMode(selectedMod.id === 'word-memory' ? pickedMode : 'basic');
-    startGame();
+    const moduleId = selectedMod.id;
+    const initialMode = moduleId === 'word-memory' ? pickedMode : 'basic';
     setSelectedMod(null);
-    navigate(`/training/${selectedMod.id}`);
+    navigate(`/training/${moduleId}`, {
+      state: {
+        autoStart: true,
+        initialDifficulty: pickedDifficulty,
+        initialMode,
+      },
+    });
   };
 
   const handlePurchaseNoAds = async () => {

@@ -57,7 +57,7 @@ function generatePath(length: number): number[] {
 
 type Phase = 'memorize' | 'ready' | 'recall';
 
-export function PathMemoryModule({ difficulty, onComplete, onExit }: TrainingModuleProps) {
+export function PathMemoryModule({ difficulty, skipReadyScreen = false, onComplete, onExit }: TrainingModuleProps) {
   const pathLength = PATH_LENGTH[difficulty] ?? 4;
   const stepMs     = STEP_MS[difficulty]     ?? 700;
   const baseScore  = DIFFICULTY_CONFIG[difficulty].baseScore;
@@ -83,7 +83,15 @@ export function PathMemoryModule({ difficulty, onComplete, onExit }: TrainingMod
         setTimeout(() => {
           if (!cancelled) {
             setHighlightIdx(-2); // -2 = show all
-            setTimeout(() => { if (!cancelled) setPhase('ready'); }, 600);
+            setTimeout(() => {
+              if (cancelled) return;
+              if (skipReadyScreen) {
+                startTimeRef.current = Date.now();
+                setPhase('recall');
+                return;
+              }
+              setPhase('ready');
+            }, 600);
           }
         }, 300);
         return;
@@ -97,7 +105,7 @@ export function PathMemoryModule({ difficulty, onComplete, onExit }: TrainingMod
     }
     const timer = setTimeout(showNext, 500);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [phase, path, stepMs]);
+  }, [phase, path, stepMs, skipReadyScreen]);
 
   const handleCellTap = useCallback((cellIdx: number) => {
     if (phase !== 'recall' || completedRef.current) return;

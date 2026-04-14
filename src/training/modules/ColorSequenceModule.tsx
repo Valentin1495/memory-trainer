@@ -32,7 +32,7 @@ function generateSequence(length: number): string[] {
 
 type Phase = 'memorize' | 'ready' | 'recall';
 
-export function ColorSequenceModule({ difficulty, onComplete, onExit }: TrainingModuleProps) {
+export function ColorSequenceModule({ difficulty, skipReadyScreen = false, onComplete, onExit }: TrainingModuleProps) {
   const seqLength = SEQ_LENGTH[difficulty] ?? 3;
   const flashMs = FLASH_MS[difficulty] ?? 900;
   const baseScore = DIFFICULTY_CONFIG[difficulty].baseScore;
@@ -61,7 +61,13 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
       if (i >= sequence.length) {
         setActiveIdx(-1);
         setTimeout(() => {
-          if (!cancelled) setPhase('ready');
+          if (cancelled) return;
+          if (skipReadyScreen) {
+            startTimeRef.current = Date.now();
+            setPhase('recall');
+            return;
+          }
+          setPhase('ready');
         }, 500);
         return;
       }
@@ -83,7 +89,7 @@ export function ColorSequenceModule({ difficulty, onComplete, onExit }: Training
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [phase, sequence, flashMs]);
+  }, [phase, sequence, flashMs, skipReadyScreen]);
 
   const handleColorTap = useCallback((colorId: string) => {
     if (phase !== 'recall') return;

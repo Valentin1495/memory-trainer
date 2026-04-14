@@ -118,10 +118,15 @@ export function SessionResult() {
 
     if (isWordModule) {
       store.resetGame();
-      store.startGame();
     }
 
-    navigate(`/training/${moduleId}`);
+    navigate(`/training/${moduleId}`, {
+      state: {
+        autoStart: true,
+        initialDifficulty: difficulty,
+        initialMode: isWordModule ? mode : 'basic',
+      },
+    });
   };
 
   const handleAcceptDifficulty = () => {
@@ -134,10 +139,15 @@ export function SessionResult() {
 
     if (isWordModule) {
       store.resetGame();
-      store.startGame();
     }
 
-    navigate(`/training/${moduleId}`);
+    navigate(`/training/${moduleId}`, {
+      state: {
+        autoStart: true,
+        initialDifficulty: suggestChange && recommendation.difficulty !== difficulty ? recommendation.difficulty : difficulty,
+        initialMode: isWordModule ? mode : 'basic',
+      },
+    });
   };
 
   const handleGoHome = () => {

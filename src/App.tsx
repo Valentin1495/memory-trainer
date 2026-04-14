@@ -11,6 +11,20 @@ import { Settings } from './pages/Settings';
 import { useUserProfileStore } from './store/userProfileStore';
 import { warmUpAdMob } from './lib/ads';
 
+function buildRedirectPath(location: ReturnType<typeof useLocation>) {
+  return `${location.pathname}${location.search}${location.hash}`;
+}
+
+function isFeatureEntryPath(pathname: string) {
+  return (
+    pathname === '/diagnosis' ||
+    pathname === '/report' ||
+    pathname === '/leaderboard' ||
+    pathname === '/session-result' ||
+    pathname.startsWith('/training/')
+  );
+}
+
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const isOnboarded = useUserProfileStore(s => s.isOnboarded);
   const isDiagnosed = useUserProfileStore(s => s.isDiagnosed);
@@ -19,13 +33,15 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
   const isPublicPath =
     location.pathname === '/onboarding' ||
-    location.pathname === '/diagnosis';
+    isFeatureEntryPath(location.pathname);
 
   if (!isOnboarded && !isPublicPath) {
-    return <Navigate to="/onboarding" replace />;
+    const redirect = encodeURIComponent(buildRedirectPath(location));
+    return <Navigate to={`/onboarding?redirect=${redirect}`} replace />;
   }
   if (isOnboarded && !isDiagnosed && !diagnosisDeferred && location.pathname === '/') {
-    return <Navigate to="/diagnosis" replace />;
+    const redirect = encodeURIComponent(buildRedirectPath(location));
+    return <Navigate to={`/diagnosis?redirect=${redirect}`} replace />;
   }
   return <>{children}</>;
 }

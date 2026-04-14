@@ -22,7 +22,7 @@ function generateSequence(length: number): number[] {
 type Phase = 'memorize' | 'ready' | 'recall';
 type CellResult = 'correct' | 'wrong' | 'empty';
 
-export function NumberSequenceModule({ difficulty, onComplete, onExit }: TrainingModuleProps) {
+export function NumberSequenceModule({ difficulty, skipReadyScreen = false, onComplete, onExit }: TrainingModuleProps) {
   const seqLength = SEQ_LENGTH[difficulty] ?? 4;
   const flashMs   = FLASH_MS[difficulty]   ?? 800;
   const baseScore = DIFFICULTY_CONFIG[difficulty].baseScore;
@@ -47,7 +47,15 @@ export function NumberSequenceModule({ difficulty, onComplete, onExit }: Trainin
       if (cancelled) return;
       if (i >= sequence.length) {
         setActiveIdx(-1);
-        setTimeout(() => { if (!cancelled) setPhase('ready'); }, 500);
+        setTimeout(() => {
+          if (cancelled) return;
+          if (skipReadyScreen) {
+            startTimeRef.current = Date.now();
+            setPhase('recall');
+            return;
+          }
+          setPhase('ready');
+        }, 500);
         return;
       }
       setActiveIdx(i);
@@ -60,7 +68,7 @@ export function NumberSequenceModule({ difficulty, onComplete, onExit }: Trainin
     }
     const timer = setTimeout(flashNext, 600);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [phase, sequence, flashMs]);
+  }, [phase, sequence, flashMs, skipReadyScreen]);
 
   const handleDigit = useCallback((digit: number) => {
     if (phase !== 'recall' || revealed) return;

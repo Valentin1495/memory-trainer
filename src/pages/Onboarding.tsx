@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { flushSync } from 'react-dom';
 import { useUserProfileStore } from '../store/userProfileStore';
@@ -24,12 +24,21 @@ const DAILY_GOALS = [
 
 type OnboardingStep = 'nickname' | 'tracking' | 'goal' | 'daily';
 
+function getSafeRedirectPath(raw: string | null) {
+  if (!raw) return '/';
+  return raw.startsWith('/') ? raw : '/';
+}
+
 export function Onboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setProfile = useUserProfileStore(s => s.setProfile);
   const setNickname = useGameStore(s => s.setNickname);
   const platform = Capacitor.getPlatform();
   const shouldUseManualKeyboardAvoidance = platform !== 'android';
+  const redirectPath = getSafeRedirectPath(
+    new URLSearchParams(location.search).get('redirect')
+  );
 
   const [step, setStep] = useState<OnboardingStep>('nickname');
   const [nickname, setNicknameLocal] = useState('');
@@ -199,7 +208,7 @@ export function Onboarding() {
     };
     setProfile(profile);
     setNickname(nickname.trim());
-    navigate('/diagnosis');
+    navigate(`/diagnosis?redirect=${encodeURIComponent(redirectPath)}`);
   };
 
   return (

@@ -73,7 +73,7 @@ function generatePlacements(count: number): ShapeCell[] {
 
 type Phase = 'memorize' | 'ready' | 'recall' | 'done';
 
-export function ShapeLocationModule({ difficulty, onComplete, onExit }: TrainingModuleProps) {
+export function ShapeLocationModule({ difficulty, skipReadyScreen = false, onComplete, onExit }: TrainingModuleProps) {
   const shapeCount = SHAPE_COUNT[difficulty] ?? 3;
   const showMs     = SHOW_MS[difficulty]     ?? 2000;
   const baseScore  = DIFFICULTY_CONFIG[difficulty].baseScore;
@@ -91,9 +91,16 @@ export function ShapeLocationModule({ difficulty, onComplete, onExit }: Training
 
   useEffect(() => {
     if (phase !== 'memorize') return;
-    const t = setTimeout(() => setPhase('ready'), showMs + 400);
+    const t = setTimeout(() => {
+      if (skipReadyScreen) {
+        startTimeRef.current = Date.now();
+        setPhase('recall');
+        return;
+      }
+      setPhase('ready');
+    }, showMs + 400);
     return () => clearTimeout(t);
-  }, [phase, showMs]);
+  }, [phase, showMs, skipReadyScreen]);
 
   const answeredCells = new Set(answers.map(a => a.cellIndex));
 
