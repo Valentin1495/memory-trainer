@@ -14,3 +14,4 @@ Project documentation is organized here.
 - [Toss App Test](./TOSS_APP_TEST.md)
 - [WebView](./WEBVIEW.md)
 - [Function](./FUNCTION.md)
+- [Smart Notification](./SMART_NOTIFICATION.md)
