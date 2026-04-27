@@ -35,9 +35,10 @@ export function Training() {
   const moduleDef = getTrainingModule(moduleId);
   const navigationState = (location.state as TrainingLocationState | null) ?? null;
   const isWordModule = moduleId === 'word-memory';
+  const isTestEntry = isWordModule && new URLSearchParams(location.search).get('entry') === 'test';
   const shouldAutoStart = navigationState?.autoStart === true;
-  const initialDifficulty = navigationState?.initialDifficulty ?? difficulty;
-  const initialMode = isWordModule ? (navigationState?.initialMode ?? mode) : 'basic';
+  const initialDifficulty = navigationState?.initialDifficulty ?? (isTestEntry ? 'easy' : difficulty);
+  const initialMode = isWordModule ? (navigationState?.initialMode ?? (isTestEntry ? 'basic' : mode)) : 'basic';
   const hasInitializedRef = useRef(false);
 
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(initialDifficulty);
@@ -113,6 +114,12 @@ export function Training() {
   if (!moduleDef) return null;
 
   const TrainingComponent = moduleDef.component;
+  const entryLabel = isTestEntry ? '1분 테스트' : '훈련 준비';
+  const pageTitle = isTestEntry ? '기억력 테스트' : moduleDef.name;
+  const pageDescription = isTestEntry
+    ? '방금 본 단어를 기억하고 점수를 확인해요.'
+    : moduleDef.description;
+  const startButtonLabel = isTestEntry ? '테스트 시작' : '훈련 시작하기';
 
   if (!hasStarted) {
     return (
@@ -127,7 +134,7 @@ export function Training() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
-            <p className="text-xs font-semibold tracking-[0.22em] text-white/45">훈련 설정</p>
+            <p className="text-xs font-semibold tracking-[0.22em] text-white/45">{entryLabel}</p>
             <div className="w-10" />
           </header>
 
@@ -141,12 +148,12 @@ export function Training() {
                 {moduleDef.icon}
               </div>
               <div>
-                <p className="text-xs font-semibold tracking-[0.18em] text-white/45">기능 진입</p>
-                <h1 className="mt-1 text-2xl font-bold text-white">{moduleDef.name}</h1>
+                <p className="text-xs font-semibold tracking-[0.18em] text-white/45">{entryLabel}</p>
+                <h1 className="mt-1 text-2xl font-bold text-white">{pageTitle}</h1>
               </div>
             </div>
 
-            <p className="text-sm leading-relaxed text-white/72">{moduleDef.description}</p>
+            <p className="text-sm leading-relaxed text-white/72">{pageDescription}</p>
 
             <section className="mt-8">
               <p className="mb-3 text-xs font-semibold tracking-[0.18em] text-white/45">난이도</p>
@@ -191,7 +198,7 @@ export function Training() {
               whileTap={{ scale: 0.98 }}
               className="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-500 to-indigo-500 py-4 text-base font-bold text-white shadow-lg"
             >
-              훈련 시작하기
+              {startButtonLabel}
             </motion.button>
           </motion.div>
         </div>

@@ -18,6 +18,7 @@ const STEP_ORDER: DiagnosisStep[] = ['intro', 'easy', 'medium', 'hard', 'complet
 export function useDiagnosis() {
   const [step, setStep] = useState<DiagnosisStep>('intro');
   const [results, setResults] = useState<Partial<DiagnosisResult>>({});
+  const [mode, setMode] = useState<'quick' | 'full'>('full');
   const addSession = useHistoryStore(s => s.addSession);
   const completeDiagnosis = useUserProfileStore(s => s.completeDiagnosis);
 
@@ -27,11 +28,19 @@ export function useDiagnosis() {
     step === 'hard' ? 'hard' : null;
 
   const stepIndex = STEP_ORDER.indexOf(step);
-  const totalSteps = 3;
+  const totalSteps = mode === 'quick' ? 1 : 3;
   const completedSteps = Math.max(0, stepIndex - 1);
   const progress = (completedSteps / totalSteps) * 100;
 
   const startDiagnosis = useCallback(() => {
+    setMode('full');
+    setResults({});
+    setStep('easy');
+  }, []);
+
+  const startQuickDiagnosis = useCallback(() => {
+    setMode('quick');
+    setResults({});
     setStep('easy');
   }, []);
 
@@ -62,6 +71,12 @@ export function useDiagnosis() {
       },
     });
 
+    if (mode === 'quick') {
+      completeDiagnosis(diagnosisScore, 'easy');
+      setStep('complete');
+      return;
+    }
+
     if (difficulty === 'easy') {
       setStep('medium');
     } else if (difficulty === 'medium') {
@@ -79,7 +94,7 @@ export function useDiagnosis() {
       completeDiagnosis(avgScore, baselineDifficulty);
       setStep('complete');
     }
-  }, [results, addSession, completeDiagnosis]);
+  }, [mode, results, addSession, completeDiagnosis]);
 
   const handleStepExit = useCallback(() => {
     // 진단 중 이탈: 현재까지 결과로 마무리
@@ -102,6 +117,7 @@ export function useDiagnosis() {
     totalSteps,
     results,
     startDiagnosis,
+    startQuickDiagnosis,
     handleStepComplete,
     handleStepExit,
   };

@@ -202,13 +202,13 @@ export function Onboarding() {
       lastModuleId: 'word-memory',
       onboardingComplete: true,
       diagnosisComplete: false,
-      diagnosisDeferred: false,
+      diagnosisDeferred: true,
       baselineScore: 0,
       createdAt: new Date().toISOString(),
     };
     setProfile(profile);
     setNickname(nickname.trim());
-    navigate(`/diagnosis?redirect=${encodeURIComponent(redirectPath)}`);
+    navigate(redirectPath, { replace: true });
   };
 
   return (

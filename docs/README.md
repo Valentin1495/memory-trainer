@@ -9,6 +9,7 @@ Project documentation is organized here.
 - [iOS Release](./IOS_RELEASE.md)
 - [QA](./QA.md)
 - [Release Checklist](./RELEASE_CHECKLIST.md)
+- [Retention Plan](./RETENTION_PLAN.md)
 - [Store Metadata](./STORE_METADATA.md)
 - [Supabase Setup](./SUPABASE_SETUP.md)
 - [Toss App Test](./TOSS_APP_TEST.md)

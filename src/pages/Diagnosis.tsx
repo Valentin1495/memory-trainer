@@ -52,8 +52,11 @@ export function Diagnosis() {
     totalSteps,
     results,
     startDiagnosis,
+    startQuickDiagnosis,
     handleStepComplete,
   } = useDiagnosis();
+  const entry = new URLSearchParams(location.search).get('entry');
+  const isCheckupEntry = entry === 'checkup';
 
   // 단계가 바뀔 때마다 난이도·모드 세팅 (startGame은 WordMemoryModule이 담당)
   useEffect(() => {
@@ -163,6 +166,22 @@ export function Diagnosis() {
   }
 
   if (step === 'intro') {
+    const introTitle = isCheckupEntry ? '기억력 점검' : '개인 맞춤 시작 평가';
+    const introDescription = isCheckupEntry
+      ? (
+        <>
+          하루 1분으로 현재 기억 상태를<br />
+          가볍게 확인해요.
+        </>
+      )
+      : (
+        <>
+          현재 기억력 수준을 측정하여<br />
+          맞춤 훈련 프로그램을 설계합니다.
+        </>
+      );
+    const quickButtonLabel = isCheckupEntry ? '1분 점검 시작' : '빠른 점검 시작';
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 safe-top safe-bottom">
         <motion.div
@@ -172,10 +191,9 @@ export function Diagnosis() {
         >
           <div className="text-center mb-8">
             <p className="text-5xl mb-4">🔬</p>
-            <h1 className="text-2xl font-bold text-white mb-3">개인 맞춤 시작 평가</h1>
+            <h1 className="text-2xl font-bold text-white mb-3">{introTitle}</h1>
             <p className="text-white/70 text-sm leading-relaxed">
-              현재 기억력 수준을 측정하여<br />
-              맞춤 훈련 프로그램을 설계합니다.
+              {introDescription}
             </p>
           </div>
 
@@ -198,20 +216,26 @@ export function Diagnosis() {
           </div>
 
           <p className="text-white/50 text-xs text-center mb-6">
-            총 3단계 · 약 2~3분 소요
+            빠른 점검 1단계 · 정밀 진단 3단계
           </p>
 
           <motion.button
-            onClick={startDiagnosis}
+            onClick={startQuickDiagnosis}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
           >
-            시작 평가 진행
+            {quickButtonLabel}
           </motion.button>
           <button
+            onClick={startDiagnosis}
+            className="w-full mt-3 rounded-xl border border-white/20 py-3 text-sm font-semibold text-white/80"
+          >
+            정밀 진단 시작
+          </button>
+          <button
             onClick={handleLater}
-            className="w-full mt-3 py-3 text-white/50 text-sm"
+            className="w-full mt-2 py-3 text-white/50 text-sm"
           >
             나중에 하기
           </button>
