@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useRecommendation } from '../hooks/useRecommendation';
 import { getFeedbackMessage } from '../lib/recommendation';
+import { requestMiniAppReviewIfAppropriate } from '../lib/review';
 import { showInterstitialAdThrottled } from '../lib/ads';
 import { useGameStore } from '../store/gameStore';
 import { useUserProfileStore } from '../store/userProfileStore';
@@ -85,6 +86,7 @@ export function SessionResult() {
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
   const [difficultyAccepted, setDifficultyAccepted] = useState(false);
   const hasSubmitted = useRef(false);
+  const hasRequestedReview = useRef(false);
 
   const moduleId = result?.moduleId ?? 'word-memory';
   const isWordModule = moduleId === 'word-memory';
@@ -180,6 +182,19 @@ export function SessionResult() {
       result
     ).then((ok) => setSubmitState(ok ? 'done' : 'error'));
   }, [difficulty, mode, navigate, result, score, store.endTime, store.nickname, submitScore, timeMs, wrongCount]);
+
+  useEffect(() => {
+    if (!result || hasRequestedReview.current) return;
+    hasRequestedReview.current = true;
+
+    void requestMiniAppReviewIfAppropriate({
+      result,
+      trainingSessions,
+      activeDayCount,
+      dailyGoalReached: dailyGoalMs > 0 && todayTrainingTimeMs >= dailyGoalMs,
+      streak,
+    });
+  }, [activeDayCount, dailyGoalMs, result, streak, todayTrainingTimeMs, trainingSessions]);
 
   const handlePlayAgain = async () => {
     setAdLoading(true);

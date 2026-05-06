@@ -8,7 +8,7 @@ import {
   showInterstitialAd as nativeShowInterstitialAd,
 } from './admob';
 
-export const TOSS_INTERSTITIAL_AD_GROUP_ID = 'ait-ad-test-interstitial-id';
+export const TOSS_INTERSTITIAL_AD_GROUP_ID = 'ait.v2.live.8a4774841d364205';
 
 function readIntEnv(name: string, fallback: number, minValue = 0): number {
   const rawValue = (import.meta.env as Record<string, unknown>)[name];
