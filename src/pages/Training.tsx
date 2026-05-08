@@ -53,12 +53,15 @@ export function Training() {
   }, [moduleDef, navigate]);
 
   useEffect(() => {
-    setSelectedDifficulty(initialDifficulty);
-    setSelectedMode(initialMode);
-    setHasStarted(shouldAutoStart);
-    setSkipReadyScreen(false);
-    hasInitializedRef.current = true;
+    queueMicrotask(() => {
+      setSelectedDifficulty(initialDifficulty);
+      setSelectedMode(initialMode);
+      setHasStarted(shouldAutoStart);
+      setSkipReadyScreen(false);
+      hasInitializedRef.current = true;
+    });
   // Reinitialize only when the route entry changes, not when store difficulty/mode updates after clicking start.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleId, location.key]);
 
   useEffect(() => {
@@ -217,7 +220,7 @@ export function Training() {
       </div>
     }>
       <TrainingComponent
-        difficulty={isWordModule ? selectedDifficulty : difficulty}
+        difficulty={selectedDifficulty}
         mode={isWordModule ? selectedMode : 'basic'}
         skipReadyScreen={skipReadyScreen}
         onComplete={handleComplete}

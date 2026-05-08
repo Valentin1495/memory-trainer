@@ -3,10 +3,15 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useRecommendation } from '../hooks/useRecommendation';
+import {
+  canUseContactsViral,
+  startContactsViralReward,
+} from '../lib/contactsViral';
 import { getFeedbackMessage } from '../lib/recommendation';
 import { requestMiniAppReviewIfAppropriate } from '../lib/review';
 import { showInterstitialAdThrottled } from '../lib/ads';
 import { useGameStore } from '../store/gameStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { useHistoryStore } from '../store/historyStore';
 import { getTrainingModule } from '../training/registry';
@@ -79,11 +84,17 @@ export function SessionResult() {
   const { profile, updateDifficulty } = useUserProfileStore();
   const sessions = useHistoryStore(s => s.sessions);
   const getStreakDays = useHistoryStore(s => s.getStreakDays);
+  const adRemoved = useSettingsStore(s => s.adRemoved);
+  const adSkipTickets = useSettingsStore(s => s.adSkipTickets);
+  const addAdSkipTickets = useSettingsStore(s => s.addAdSkipTickets);
   const recommendation = useRecommendation();
   const { submitScore, submitError } = useLeaderboard({ period: 'daily' });
 
   const [adLoading, setAdLoading] = useState(false);
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
+  const [shareRewardState, setShareRewardState] = useState<'idle' | 'opening' | 'rewarded' | 'error'>('idle');
+  const [shareRewardMessage, setShareRewardMessage] = useState<string | null>(null);
+  const [adSkipMessage, setAdSkipMessage] = useState<string | null>(null);
   const [difficultyAccepted, setDifficultyAccepted] = useState(false);
   const hasSubmitted = useRef(false);
   const hasRequestedReview = useRef(false);
@@ -130,6 +141,7 @@ export function SessionResult() {
     streak,
   });
   const shouldPromptDiagnosis = profile?.diagnosisDeferred === true && profile?.diagnosisComplete !== true;
+  const canShowShareReward = canUseContactsViral() && !adRemoved;
 
   const nonWordSummary = (() => {
     switch (moduleId) {
@@ -171,7 +183,7 @@ export function SessionResult() {
     if (hasSubmitted.current) return;
     hasSubmitted.current = true;
 
-    setSubmitState('submitting');
+    queueMicrotask(() => setSubmitState('submitting'));
     submitScore(
       store.nickname,
       score,
@@ -198,8 +210,9 @@ export function SessionResult() {
 
   const handlePlayAgain = async () => {
     setAdLoading(true);
-    await showInterstitialAdThrottled();
+    const adResult = await showInterstitialAdThrottled();
     setAdLoading(false);
+    setAdSkipMessage(adResult === 'skipped-ticket' ? '광고 스킵권을 사용했어요.' : null);
 
     if (isWordModule) {
       store.resetGame();
@@ -245,8 +258,9 @@ export function SessionResult() {
 
   const handleGoLeaderboard = async () => {
     setAdLoading(true);
-    await showInterstitialAdThrottled();
+    const adResult = await showInterstitialAdThrottled();
     setAdLoading(false);
+    setAdSkipMessage(adResult === 'skipped-ticket' ? '광고 스킵권을 사용했어요.' : null);
     navigate('/leaderboard', { state: { moduleId } });
   };
 
@@ -264,6 +278,60 @@ export function SessionResult() {
     }
 
     navigate('/diagnosis?entry=checkup');
+  };
+
+  const handleShareReward = () => {
+    if (shareRewardState === 'opening') return;
+
+    if (!canUseContactsViral()) {
+      setShareRewardState('error');
+      setShareRewardMessage('토스앱에서만 공유 리워드를 사용할 수 있어요.');
+      return;
+    }
+
+    setShareRewardState('opening');
+    setShareRewardMessage(null);
+
+    let cleanup: (() => void) | null = null;
+    let awardedTicketCount = 0;
+    cleanup = startContactsViralReward({
+      onReward: (rewardAmount) => {
+        const ticketCount = Math.max(1, Math.floor(rewardAmount));
+        awardedTicketCount += ticketCount;
+        addAdSkipTickets(ticketCount);
+        setShareRewardState('rewarded');
+        setShareRewardMessage(`광고 스킵권 ${ticketCount.toLocaleString()}개를 받았어요.`);
+      },
+      onClose: (event) => {
+        cleanup?.();
+        cleanup = null;
+
+        if (event.sentRewardsCount > 0) {
+          if (awardedTicketCount === 0) {
+            awardedTicketCount = event.sentRewardsCount;
+            addAdSkipTickets(event.sentRewardsCount);
+          }
+          setShareRewardState('rewarded');
+          setShareRewardMessage(`광고 스킵권 ${awardedTicketCount.toLocaleString()}개를 받았어요.`);
+          return;
+        }
+
+        setShareRewardState('idle');
+        setShareRewardMessage(null);
+      },
+      onError: (error) => {
+        console.warn('[ContactsViral] contactsViral failed', error);
+        cleanup?.();
+        cleanup = null;
+        setShareRewardState('error');
+        setShareRewardMessage('공유 리워드를 여는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+      },
+    });
+
+    if (!cleanup) {
+      setShareRewardState('error');
+      setShareRewardMessage('공유 리워드 설정을 확인해 주세요.');
+    }
   };
 
   const formatTime = (ms: number) => `${(ms / 1000).toFixed(1)}초`;
@@ -435,7 +503,44 @@ export function SessionResult() {
               </motion.button>
             )}
 
+            {canShowShareReward && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 }}
+                className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.14em] text-emerald-500">공유 리워드</p>
+                    <p className="mt-1 text-sm font-bold text-gray-800">친구에게 공유하고 광고 스킵권 받기</p>
+                  </div>
+                  <span className="shrink-0 text-xl">🎁</span>
+                </div>
+                <p className="mb-3 text-xs text-emerald-700">
+                  보유 스킵권 {adSkipTickets.toLocaleString()}개
+                </p>
+                <button
+                  onClick={handleShareReward}
+                  disabled={adLoading || shareRewardState === 'opening'}
+                  className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-60"
+                >
+                  {shareRewardState === 'opening' ? '공유 화면 여는 중...' : '친구에게 공유하기'}
+                </button>
+                {shareRewardMessage && (
+                  <p className={`mt-2 text-center text-xs ${
+                    shareRewardState === 'error' ? 'text-red-500' : 'text-emerald-700'
+                  }`}>
+                    {shareRewardMessage}
+                  </p>
+                )}
+              </motion.div>
+            )}
+
             <div className="space-y-2.5">
+              {adSkipMessage && (
+                <p className="text-center text-xs font-medium text-emerald-600">{adSkipMessage}</p>
+              )}
               <motion.button
                 onClick={handlePlayAgain}
                 disabled={adLoading}
@@ -467,7 +572,7 @@ export function SessionResult() {
                   disabled={adLoading}
                   className="w-full py-1 text-xs font-medium text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-60"
                 >
-                  리더보드도 확인하기
+                  리더보드 확인하기
                 </button>
               )}
             </div>

@@ -218,14 +218,22 @@ export async function showInterstitialAd(): Promise<void> {
   preloadTossInterstitial();
 }
 
-export async function showInterstitialAdThrottled(): Promise<void> {
-  if (useSettingsStore.getState().adRemoved) return;
+export type InterstitialAdResult = 'skipped-removed' | 'skipped-ticket' | 'not-due' | 'cooldown' | 'shown';
+
+export async function showInterstitialAdThrottled(): Promise<InterstitialAdResult> {
+  if (useSettingsStore.getState().adRemoved) return 'skipped-removed';
 
   sessionsSinceLastAd++;
-  if (sessionsSinceLastAd < AD_FREQUENCY) return;
+  if (sessionsSinceLastAd < AD_FREQUENCY) return 'not-due';
 
-  if (lastAdShownAt !== null && Date.now() - lastAdShownAt < AD_COOLDOWN_MS) return;
+  if (lastAdShownAt !== null && Date.now() - lastAdShownAt < AD_COOLDOWN_MS) return 'cooldown';
 
   sessionsSinceLastAd = 0;
+
+  if (useSettingsStore.getState().useAdSkipTicket()) {
+    return 'skipped-ticket';
+  }
+
   await showInterstitialAd();
+  return 'shown';
 }

@@ -1,8 +1,10 @@
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDiagnosis } from '../hooks/useDiagnosis';
+import { canUseContactsViral, startContactsViralReward } from '../lib/contactsViral';
 import { useGameStore } from '../store/gameStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { getTrainingModule } from '../training/registry';
 import { getUserLevelSummary } from '../lib/recommendation';
@@ -41,6 +43,9 @@ export function Diagnosis() {
   const deferDiagnosis = useUserProfileStore(s => s.deferDiagnosis);
   const profileDifficulty = useUserProfileStore(s => s.profile?.currentDifficulty ?? 'easy');
   const baselineScore = useUserProfileStore(s => s.profile?.baselineScore ?? 0);
+  const adRemoved = useSettingsStore(s => s.adRemoved);
+  const adSkipTickets = useSettingsStore(s => s.adSkipTickets);
+  const addAdSkipTickets = useSettingsStore(s => s.addAdSkipTickets);
   const redirectPath = getSafeRedirectPath(
     new URLSearchParams(location.search).get('redirect')
   );
@@ -55,8 +60,11 @@ export function Diagnosis() {
     startQuickDiagnosis,
     handleStepComplete,
   } = useDiagnosis();
+  const [shareRewardState, setShareRewardState] = useState<'idle' | 'opening' | 'rewarded' | 'error'>('idle');
+  const [shareRewardMessage, setShareRewardMessage] = useState<string | null>(null);
   const entry = new URLSearchParams(location.search).get('entry');
   const isCheckupEntry = entry === 'checkup';
+  const canShowShareReward = canUseContactsViral() && !adRemoved;
 
   // 단계가 바뀔 때마다 난이도·모드 세팅 (startGame은 WordMemoryModule이 담당)
   useEffect(() => {
@@ -80,6 +88,60 @@ export function Diagnosis() {
   const handleCancelDiagnosis = () => {
     deferDiagnosis();
     navigate(redirectPath, { replace: true });
+  };
+
+  const handleShareReward = () => {
+    if (shareRewardState === 'opening') return;
+
+    if (!canUseContactsViral()) {
+      setShareRewardState('error');
+      setShareRewardMessage('토스앱에서만 공유 리워드를 사용할 수 있어요.');
+      return;
+    }
+
+    setShareRewardState('opening');
+    setShareRewardMessage(null);
+
+    let cleanup: (() => void) | null = null;
+    let awardedTicketCount = 0;
+    cleanup = startContactsViralReward({
+      onReward: (rewardAmount) => {
+        const ticketCount = Math.max(1, Math.floor(rewardAmount));
+        awardedTicketCount += ticketCount;
+        addAdSkipTickets(ticketCount);
+        setShareRewardState('rewarded');
+        setShareRewardMessage(`광고 스킵권 ${ticketCount.toLocaleString()}개를 받았어요.`);
+      },
+      onClose: (event) => {
+        cleanup?.();
+        cleanup = null;
+
+        if (event.sentRewardsCount > 0) {
+          if (awardedTicketCount === 0) {
+            awardedTicketCount = event.sentRewardsCount;
+            addAdSkipTickets(event.sentRewardsCount);
+          }
+          setShareRewardState('rewarded');
+          setShareRewardMessage(`광고 스킵권 ${awardedTicketCount.toLocaleString()}개를 받았어요.`);
+          return;
+        }
+
+        setShareRewardState('idle');
+        setShareRewardMessage(null);
+      },
+      onError: (error) => {
+        console.warn('[ContactsViral] contactsViral failed', error);
+        cleanup?.();
+        cleanup = null;
+        setShareRewardState('error');
+        setShareRewardMessage('공유 리워드를 여는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+      },
+    });
+
+    if (!cleanup) {
+      setShareRewardState('error');
+      setShareRewardMessage('공유 리워드 설정을 확인해 주세요.');
+    }
   };
 
   if (step === 'complete') {
@@ -151,6 +213,40 @@ export function Diagnosis() {
             <p className="mt-2 text-sm text-white/70">{levelSummary.description}</p>
             <p className="mt-3 text-xs text-white/45">Baseline score {baselineScore}</p>
           </div>
+
+          {canShowShareReward && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="mb-5 rounded-2xl border border-emerald-300/20 bg-emerald-400/15 p-4"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.14em] text-emerald-100/80">공유 리워드</p>
+                  <p className="mt-1 text-sm font-bold text-white">친구에게 공유하고 광고 스킵권 받기</p>
+                </div>
+                <span className="shrink-0 text-xl">🎁</span>
+              </div>
+              <p className="mb-3 text-xs text-emerald-50/80">
+                보유 스킵권 {adSkipTickets.toLocaleString()}개
+              </p>
+              <button
+                onClick={handleShareReward}
+                disabled={shareRewardState === 'opening'}
+                className="w-full rounded-xl bg-emerald-400 py-3 text-sm font-bold text-slate-950 shadow disabled:opacity-60"
+              >
+                {shareRewardState === 'opening' ? '공유 화면 여는 중...' : '친구에게 공유하기'}
+              </button>
+              {shareRewardMessage && (
+                <p className={`mt-2 text-center text-xs ${
+                  shareRewardState === 'error' ? 'text-red-200' : 'text-emerald-50'
+                }`}>
+                  {shareRewardMessage}
+                </p>
+              )}
+            </motion.div>
+          )}
 
           <motion.button
             onClick={() => navigate(redirectPath)}
