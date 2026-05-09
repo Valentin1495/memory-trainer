@@ -1,8 +1,10 @@
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDiagnosis } from '../hooks/useDiagnosis';
+import { canUseContactsViral, startContactsViralReward } from '../lib/contactsViral';
 import { useGameStore } from '../store/gameStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { getTrainingModule } from '../training/registry';
 import { getUserLevelSummary } from '../lib/recommendation';
@@ -41,6 +43,9 @@ export function Diagnosis() {
   const deferDiagnosis = useUserProfileStore(s => s.deferDiagnosis);
   const profileDifficulty = useUserProfileStore(s => s.profile?.currentDifficulty ?? 'easy');
   const baselineScore = useUserProfileStore(s => s.profile?.baselineScore ?? 0);
+  const adRemoved = useSettingsStore(s => s.adRemoved);
+  const adSkipTickets = useSettingsStore(s => s.adSkipTickets);
+  const addAdSkipTickets = useSettingsStore(s => s.addAdSkipTickets);
   const redirectPath = getSafeRedirectPath(
     new URLSearchParams(location.search).get('redirect')
   );
@@ -52,8 +57,14 @@ export function Diagnosis() {
     totalSteps,
     results,
     startDiagnosis,
+    startQuickDiagnosis,
     handleStepComplete,
   } = useDiagnosis();
+  const [shareRewardState, setShareRewardState] = useState<'idle' | 'opening' | 'rewarded' | 'error'>('idle');
+  const [shareRewardMessage, setShareRewardMessage] = useState<string | null>(null);
+  const entry = new URLSearchParams(location.search).get('entry');
+  const isCheckupEntry = entry === 'checkup';
+  const canShowShareReward = canUseContactsViral() && !adRemoved;
 
   // 단계가 바뀔 때마다 난이도·모드 세팅 (startGame은 WordMemoryModule이 담당)
   useEffect(() => {
@@ -77,6 +88,60 @@ export function Diagnosis() {
   const handleCancelDiagnosis = () => {
     deferDiagnosis();
     navigate(redirectPath, { replace: true });
+  };
+
+  const handleShareReward = () => {
+    if (shareRewardState === 'opening') return;
+
+    if (!canUseContactsViral()) {
+      setShareRewardState('error');
+      setShareRewardMessage('토스앱에서만 공유 리워드를 사용할 수 있어요.');
+      return;
+    }
+
+    setShareRewardState('opening');
+    setShareRewardMessage(null);
+
+    let cleanup: (() => void) | null = null;
+    let awardedTicketCount = 0;
+    cleanup = startContactsViralReward({
+      onReward: (rewardAmount) => {
+        const ticketCount = Math.max(1, Math.floor(rewardAmount));
+        awardedTicketCount += ticketCount;
+        addAdSkipTickets(ticketCount);
+        setShareRewardState('rewarded');
+        setShareRewardMessage(`광고 스킵권 ${ticketCount.toLocaleString()}개를 받았어요.`);
+      },
+      onClose: (event) => {
+        cleanup?.();
+        cleanup = null;
+
+        if (event.sentRewardsCount > 0) {
+          if (awardedTicketCount === 0) {
+            awardedTicketCount = event.sentRewardsCount;
+            addAdSkipTickets(event.sentRewardsCount);
+          }
+          setShareRewardState('rewarded');
+          setShareRewardMessage(`광고 스킵권 ${awardedTicketCount.toLocaleString()}개를 받았어요.`);
+          return;
+        }
+
+        setShareRewardState('idle');
+        setShareRewardMessage(null);
+      },
+      onError: (error) => {
+        console.warn('[ContactsViral] contactsViral failed', error);
+        cleanup?.();
+        cleanup = null;
+        setShareRewardState('error');
+        setShareRewardMessage('공유 리워드를 여는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+      },
+    });
+
+    if (!cleanup) {
+      setShareRewardState('error');
+      setShareRewardMessage('공유 리워드 설정을 확인해 주세요.');
+    }
   };
 
   if (step === 'complete') {
@@ -149,6 +214,40 @@ export function Diagnosis() {
             <p className="mt-3 text-xs text-white/45">Baseline score {baselineScore}</p>
           </div>
 
+          {canShowShareReward && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="mb-5 rounded-2xl border border-emerald-300/20 bg-emerald-400/15 p-4"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.14em] text-emerald-100/80">공유 리워드</p>
+                  <p className="mt-1 text-sm font-bold text-white">친구에게 공유하고 광고 스킵권 받기</p>
+                </div>
+                <span className="shrink-0 text-xl">🎁</span>
+              </div>
+              <p className="mb-3 text-xs text-emerald-50/80">
+                보유 스킵권 {adSkipTickets.toLocaleString()}개
+              </p>
+              <button
+                onClick={handleShareReward}
+                disabled={shareRewardState === 'opening'}
+                className="w-full rounded-xl bg-emerald-400 py-3 text-sm font-bold text-slate-950 shadow disabled:opacity-60"
+              >
+                {shareRewardState === 'opening' ? '공유 화면 여는 중...' : '친구에게 공유하기'}
+              </button>
+              {shareRewardMessage && (
+                <p className={`mt-2 text-center text-xs ${
+                  shareRewardState === 'error' ? 'text-red-200' : 'text-emerald-50'
+                }`}>
+                  {shareRewardMessage}
+                </p>
+              )}
+            </motion.div>
+          )}
+
           <motion.button
             onClick={() => navigate(redirectPath)}
             whileHover={{ scale: 1.02 }}
@@ -163,6 +262,22 @@ export function Diagnosis() {
   }
 
   if (step === 'intro') {
+    const introTitle = isCheckupEntry ? '기억력 점검' : '개인 맞춤 시작 평가';
+    const introDescription = isCheckupEntry
+      ? (
+        <>
+          하루 1분으로 현재 기억 상태를<br />
+          가볍게 확인해요.
+        </>
+      )
+      : (
+        <>
+          현재 기억력 수준을 측정하여<br />
+          맞춤 훈련 프로그램을 설계합니다.
+        </>
+      );
+    const quickButtonLabel = isCheckupEntry ? '1분 점검 시작' : '빠른 점검 시작';
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 safe-top safe-bottom">
         <motion.div
@@ -172,10 +287,9 @@ export function Diagnosis() {
         >
           <div className="text-center mb-8">
             <p className="text-5xl mb-4">🔬</p>
-            <h1 className="text-2xl font-bold text-white mb-3">개인 맞춤 시작 평가</h1>
+            <h1 className="text-2xl font-bold text-white mb-3">{introTitle}</h1>
             <p className="text-white/70 text-sm leading-relaxed">
-              현재 기억력 수준을 측정하여<br />
-              맞춤 훈련 프로그램을 설계합니다.
+              {introDescription}
             </p>
           </div>
 
@@ -198,20 +312,26 @@ export function Diagnosis() {
           </div>
 
           <p className="text-white/50 text-xs text-center mb-6">
-            총 3단계 · 약 2~3분 소요
+            빠른 점검 1단계 · 정밀 진단 3단계
           </p>
 
           <motion.button
-            onClick={startDiagnosis}
+            onClick={startQuickDiagnosis}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="w-full py-4 bg-white text-purple-700 font-bold rounded-xl shadow"
           >
-            시작 평가 진행
+            {quickButtonLabel}
           </motion.button>
           <button
+            onClick={startDiagnosis}
+            className="w-full mt-3 rounded-xl border border-white/20 py-3 text-sm font-semibold text-white/80"
+          >
+            정밀 진단 시작
+          </button>
+          <button
             onClick={handleLater}
-            className="w-full mt-3 py-3 text-white/50 text-sm"
+            className="w-full mt-2 py-3 text-white/50 text-sm"
           >
             나중에 하기
           </button>

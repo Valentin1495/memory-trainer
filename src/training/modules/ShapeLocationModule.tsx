@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TrainingModuleProps, TrainingSessionResult } from '../../types/training';
 import { DIFFICULTY_CONFIG } from '../../types';
@@ -86,7 +86,7 @@ export function ShapeLocationModule({ difficulty, skipReadyScreen = false, onCom
   const [pendingCell, setPendingCell]   = useState<number | null>(null);
   const [revealed, setRevealed]         = useState(false);
   const [resultReady, setResultReady]   = useState<TrainingSessionResult | null>(null);
-  const startTimeRef                    = useRef<number>(Date.now());
+  const startTimeRef                    = useRef<number>(0);
   const completedRef                    = useRef(false);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export function ShapeLocationModule({ difficulty, skipReadyScreen = false, onCom
     return () => clearTimeout(t);
   }, [phase, showMs, skipReadyScreen]);
 
-  const answeredCells = new Set(answers.map(a => a.cellIndex));
+  const answeredCells = useMemo(() => new Set(answers.map(a => a.cellIndex)), [answers]);
 
   /** 칸을 탭하면 도형 선택 팝업을 띄움 */
   const handleCellTap = useCallback((cellIndex: number) => {
@@ -147,7 +147,7 @@ export function ShapeLocationModule({ difficulty, skipReadyScreen = false, onCom
         },
       } as TrainingSessionResult);
     }
-  }, [pendingCell, shapeCount, placements, baseScore, difficulty, onComplete]);
+  }, [pendingCell, shapeCount, placements, baseScore, difficulty]);
 
   function cellStatus(idx: number): 'correct' | 'wrong' | 'missed' | 'false-alarm' | 'default' {
     if (!revealed) return 'default';

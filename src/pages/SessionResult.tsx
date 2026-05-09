@@ -3,12 +3,20 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useRecommendation } from '../hooks/useRecommendation';
+import {
+  canUseContactsViral,
+  startContactsViralReward,
+} from '../lib/contactsViral';
 import { getFeedbackMessage } from '../lib/recommendation';
+import { requestMiniAppReviewIfAppropriate } from '../lib/review';
 import { showInterstitialAdThrottled } from '../lib/ads';
 import { useGameStore } from '../store/gameStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useUserProfileStore } from '../store/userProfileStore';
+import { useHistoryStore } from '../store/historyStore';
+import { getTrainingModule } from '../training/registry';
 import { DIFFICULTY_CONFIG } from '../types';
-import type { TrainingSessionResult } from '../types/training';
+import type { SessionRecord, TrainingSessionResult } from '../types/training';
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: '쉬움',
@@ -16,7 +24,56 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   hard: '어려움',
 };
 
+function getDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
+function getActiveDayCount(sessions: SessionRecord[]): number {
+  const activeDays = new Set(
+    sessions
+      .filter(session => !session.metadata.isDiagnosis)
+      .map(session => session.completedAt.slice(0, 10))
+  );
+
+  return activeDays.size;
+}
+
+function getTodayTrainingTimeMs(sessions: SessionRecord[]): number {
+  const today = getDateKey(new Date());
+  return sessions
+    .filter(session => !session.metadata.isDiagnosis && session.completedAt.slice(0, 10) === today)
+    .reduce((sum, session) => sum + session.timeMs, 0);
+}
+
+function getTomorrowGoalMessage({
+  trainingSessionCount,
+  dailyGoalReached,
+  hasMissedWords,
+  streak,
+}: {
+  trainingSessionCount: number;
+  dailyGoalReached: boolean;
+  hasMissedWords: boolean;
+  streak: number;
+}): string {
+  if (trainingSessionCount <= 1) {
+    return '첫 훈련 완료. 내일 한 번만 더 하면 2일 루틴이 시작돼요.';
+  }
+
+  if (dailyGoalReached) {
+    return '오늘 목표를 채웠어요. 내일은 정확도를 조금 더 안정적으로 이어가볼게요.';
+  }
+
+  if (hasMissedWords) {
+    return '놓친 단어가 남아 있어요. 다음 훈련에서 다시 잡아볼 수 있어요.';
+  }
+
+  if (streak >= 1) {
+    return `${streak}일 흐름이 만들어졌어요. 내일 이어서 루틴을 지켜볼게요.`;
+  }
+
+  return '내일도 1분만 이어가면 이번 주 리포트가 더 정확해져요.';
+}
 
 export function SessionResult() {
   const navigate = useNavigate();
@@ -24,14 +81,23 @@ export function SessionResult() {
   const result = location.state?.result as TrainingSessionResult | undefined;
 
   const store = useGameStore();
-  const { updateDifficulty } = useUserProfileStore();
+  const { profile, updateDifficulty } = useUserProfileStore();
+  const sessions = useHistoryStore(s => s.sessions);
+  const getStreakDays = useHistoryStore(s => s.getStreakDays);
+  const adRemoved = useSettingsStore(s => s.adRemoved);
+  const adSkipTickets = useSettingsStore(s => s.adSkipTickets);
+  const addAdSkipTickets = useSettingsStore(s => s.addAdSkipTickets);
   const recommendation = useRecommendation();
   const { submitScore, submitError } = useLeaderboard({ period: 'daily' });
 
   const [adLoading, setAdLoading] = useState(false);
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
+  const [shareRewardState, setShareRewardState] = useState<'idle' | 'opening' | 'rewarded' | 'error'>('idle');
+  const [shareRewardMessage, setShareRewardMessage] = useState<string | null>(null);
+  const [adSkipMessage, setAdSkipMessage] = useState<string | null>(null);
   const [difficultyAccepted, setDifficultyAccepted] = useState(false);
   const hasSubmitted = useRef(false);
+  const hasRequestedReview = useRef(false);
 
   const moduleId = result?.moduleId ?? 'word-memory';
   const isWordModule = moduleId === 'word-memory';
@@ -58,6 +124,24 @@ export function SessionResult() {
   const correctSteps = result?.metadata?.correctSteps as number | undefined;
   const shapeCount = result?.metadata?.shapeCount as number | undefined;
   const correctHits = result?.metadata?.correctHits as number | undefined;
+  const trainingSessions = sessions.filter(session => !session.metadata.isDiagnosis);
+  const activeDayCount = getActiveDayCount(trainingSessions);
+  const starterProgress = Math.min(activeDayCount, 3);
+  const todayTrainingTimeMs = getTodayTrainingTimeMs(trainingSessions);
+  const dailyGoalMs = (profile?.dailyGoalMinutes ?? 3) * 60000;
+  const streak = getStreakDays();
+  const nextModule = getTrainingModule(recommendation.moduleId);
+  const nextModuleLabel = nextModule
+    ? `${nextModule.icon} ${nextModule.name}`
+    : '추천 훈련';
+  const tomorrowGoalMessage = getTomorrowGoalMessage({
+    trainingSessionCount: trainingSessions.length,
+    dailyGoalReached: dailyGoalMs > 0 && todayTrainingTimeMs >= dailyGoalMs,
+    hasMissedWords: isWordModule && missedWords.length > 0,
+    streak,
+  });
+  const shouldPromptDiagnosis = profile?.diagnosisDeferred === true && profile?.diagnosisComplete !== true;
+  const canShowShareReward = canUseContactsViral() && !adRemoved;
 
   const nonWordSummary = (() => {
     switch (moduleId) {
@@ -99,7 +183,7 @@ export function SessionResult() {
     if (hasSubmitted.current) return;
     hasSubmitted.current = true;
 
-    setSubmitState('submitting');
+    queueMicrotask(() => setSubmitState('submitting'));
     submitScore(
       store.nickname,
       score,
@@ -111,10 +195,24 @@ export function SessionResult() {
     ).then((ok) => setSubmitState(ok ? 'done' : 'error'));
   }, [difficulty, mode, navigate, result, score, store.endTime, store.nickname, submitScore, timeMs, wrongCount]);
 
+  useEffect(() => {
+    if (!result || hasRequestedReview.current) return;
+    hasRequestedReview.current = true;
+
+    void requestMiniAppReviewIfAppropriate({
+      result,
+      trainingSessions,
+      activeDayCount,
+      dailyGoalReached: dailyGoalMs > 0 && todayTrainingTimeMs >= dailyGoalMs,
+      streak,
+    });
+  }, [activeDayCount, dailyGoalMs, result, streak, todayTrainingTimeMs, trainingSessions]);
+
   const handlePlayAgain = async () => {
     setAdLoading(true);
-    await showInterstitialAdThrottled();
+    const adResult = await showInterstitialAdThrottled();
     setAdLoading(false);
+    setAdSkipMessage(adResult === 'skipped-ticket' ? '광고 스킵권을 사용했어요.' : null);
 
     if (isWordModule) {
       store.resetGame();
@@ -160,9 +258,80 @@ export function SessionResult() {
 
   const handleGoLeaderboard = async () => {
     setAdLoading(true);
-    await showInterstitialAdThrottled();
+    const adResult = await showInterstitialAdThrottled();
     setAdLoading(false);
+    setAdSkipMessage(adResult === 'skipped-ticket' ? '광고 스킵권을 사용했어요.' : null);
     navigate('/leaderboard', { state: { moduleId } });
+  };
+
+  const handleGoReport = () => {
+    if (isWordModule) {
+      store.resetGame();
+    }
+
+    navigate('/report');
+  };
+
+  const handleGoDiagnosis = () => {
+    if (isWordModule) {
+      store.resetGame();
+    }
+
+    navigate('/diagnosis?entry=checkup');
+  };
+
+  const handleShareReward = () => {
+    if (shareRewardState === 'opening') return;
+
+    if (!canUseContactsViral()) {
+      setShareRewardState('error');
+      setShareRewardMessage('토스앱에서만 공유 리워드를 사용할 수 있어요.');
+      return;
+    }
+
+    setShareRewardState('opening');
+    setShareRewardMessage(null);
+
+    let cleanup: (() => void) | null = null;
+    let awardedTicketCount = 0;
+    cleanup = startContactsViralReward({
+      onReward: (rewardAmount) => {
+        const ticketCount = Math.max(1, Math.floor(rewardAmount));
+        awardedTicketCount += ticketCount;
+        addAdSkipTickets(ticketCount);
+        setShareRewardState('rewarded');
+        setShareRewardMessage(`광고 스킵권 ${ticketCount.toLocaleString()}개를 받았어요.`);
+      },
+      onClose: (event) => {
+        cleanup?.();
+        cleanup = null;
+
+        if (event.sentRewardsCount > 0) {
+          if (awardedTicketCount === 0) {
+            awardedTicketCount = event.sentRewardsCount;
+            addAdSkipTickets(event.sentRewardsCount);
+          }
+          setShareRewardState('rewarded');
+          setShareRewardMessage(`광고 스킵권 ${awardedTicketCount.toLocaleString()}개를 받았어요.`);
+          return;
+        }
+
+        setShareRewardState('idle');
+        setShareRewardMessage(null);
+      },
+      onError: (error) => {
+        console.warn('[ContactsViral] contactsViral failed', error);
+        cleanup?.();
+        cleanup = null;
+        setShareRewardState('error');
+        setShareRewardMessage('공유 리워드를 여는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+      },
+    });
+
+    if (!cleanup) {
+      setShareRewardState('error');
+      setShareRewardMessage('공유 리워드 설정을 확인해 주세요.');
+    }
   };
 
   const formatTime = (ms: number) => `${(ms / 1000).toFixed(1)}초`;
@@ -295,7 +464,83 @@ export function SessionResult() {
               </p>
             )}
 
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="mb-4 rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-slate-50 p-4"
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold tracking-[0.16em] text-purple-400">내일 목표</p>
+                  <p className="mt-1 truncate text-sm font-bold text-gray-800">{nextModuleLabel}</p>
+                </div>
+                <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-600 shadow-sm">
+                  {starterProgress}/3
+                </div>
+              </div>
+              <p className="text-sm leading-relaxed text-gray-600">{tomorrowGoalMessage}</p>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-[width] duration-300"
+                  style={{ width: `${(starterProgress / 3) * 100}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-400">3일 스타터 루틴 진행률</p>
+            </motion.div>
+
+            {shouldPromptDiagnosis && (
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.16 }}
+                onClick={handleGoDiagnosis}
+                className="mb-4 w-full rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-left"
+              >
+                <p className="text-xs font-semibold tracking-[0.14em] text-amber-500">추천 정확도 올리기</p>
+                <p className="mt-1 text-sm font-bold text-gray-800">1분 점검으로 난이도를 맞춰볼까요?</p>
+                <p className="mt-1 text-xs text-gray-500">지금 결과를 바탕으로 다음 훈련 추천이 더 정확해져요.</p>
+              </motion.button>
+            )}
+
+            {canShowShareReward && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 }}
+                className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.14em] text-emerald-500">공유 리워드</p>
+                    <p className="mt-1 text-sm font-bold text-gray-800">친구에게 공유하고 광고 스킵권 받기</p>
+                  </div>
+                  <span className="shrink-0 text-xl">🎁</span>
+                </div>
+                <p className="mb-3 text-xs text-emerald-700">
+                  보유 스킵권 {adSkipTickets.toLocaleString()}개
+                </p>
+                <button
+                  onClick={handleShareReward}
+                  disabled={adLoading || shareRewardState === 'opening'}
+                  className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-60"
+                >
+                  {shareRewardState === 'opening' ? '공유 화면 여는 중...' : '친구에게 공유하기'}
+                </button>
+                {shareRewardMessage && (
+                  <p className={`mt-2 text-center text-xs ${
+                    shareRewardState === 'error' ? 'text-red-500' : 'text-emerald-700'
+                  }`}>
+                    {shareRewardMessage}
+                  </p>
+                )}
+              </motion.div>
+            )}
+
             <div className="space-y-2.5">
+              {adSkipMessage && (
+                <p className="text-center text-xs font-medium text-emerald-600">{adSkipMessage}</p>
+              )}
               <motion.button
                 onClick={handlePlayAgain}
                 disabled={adLoading}
@@ -314,13 +559,22 @@ export function SessionResult() {
                   홈으로
                 </button>
                 <button
-                  onClick={handleGoLeaderboard}
+                  onClick={handleGoReport}
                   disabled={adLoading}
                   className="rounded-xl border-2 border-gray-300 py-3 text-sm font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-60"
                 >
-                  리더보드
+                  리포트 보기
                 </button>
               </div>
+              {trainingSessions.length > 3 && (
+                <button
+                  onClick={handleGoLeaderboard}
+                  disabled={adLoading}
+                  className="w-full py-1 text-xs font-medium text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-60"
+                >
+                  리더보드 확인하기
+                </button>
+              )}
             </div>
           </motion.div>
         </div>

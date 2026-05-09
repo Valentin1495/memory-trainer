@@ -8,7 +8,7 @@ import {
   showInterstitialAd as nativeShowInterstitialAd,
 } from './admob';
 
-export const TOSS_INTERSTITIAL_AD_GROUP_ID = 'ait-ad-test-interstitial-id';
+export const TOSS_INTERSTITIAL_AD_GROUP_ID = 'ait.v2.live.8a4774841d364205';
 
 function readIntEnv(name: string, fallback: number, minValue = 0): number {
   const rawValue = (import.meta.env as Record<string, unknown>)[name];
@@ -218,14 +218,22 @@ export async function showInterstitialAd(): Promise<void> {
   preloadTossInterstitial();
 }
 
-export async function showInterstitialAdThrottled(): Promise<void> {
-  if (useSettingsStore.getState().adRemoved) return;
+export type InterstitialAdResult = 'skipped-removed' | 'skipped-ticket' | 'not-due' | 'cooldown' | 'shown';
+
+export async function showInterstitialAdThrottled(): Promise<InterstitialAdResult> {
+  if (useSettingsStore.getState().adRemoved) return 'skipped-removed';
 
   sessionsSinceLastAd++;
-  if (sessionsSinceLastAd < AD_FREQUENCY) return;
+  if (sessionsSinceLastAd < AD_FREQUENCY) return 'not-due';
 
-  if (lastAdShownAt !== null && Date.now() - lastAdShownAt < AD_COOLDOWN_MS) return;
+  if (lastAdShownAt !== null && Date.now() - lastAdShownAt < AD_COOLDOWN_MS) return 'cooldown';
 
   sessionsSinceLastAd = 0;
+
+  if (useSettingsStore.getState().useAdSkipTicket()) {
+    return 'skipped-ticket';
+  }
+
   await showInterstitialAd();
+  return 'shown';
 }

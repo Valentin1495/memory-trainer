@@ -55,7 +55,7 @@ export function Settings() {
   const { profile, updateGoal, updateDailyGoal, resetDiagnosis, resetProfile } = useUserProfileStore();
   const { clearHistory } = useHistoryStore();
   const { setNickname } = useGameStore();
-  const { adRemoved, setAdRemoved } = useSettingsStore();
+  const { adRemoved, adSkipTickets, setAdRemoved, clearAdSkipTickets } = useSettingsStore();
 
   const [iapLoading, setIapLoading] = useState(false);
   const [iapFeedback, setIapFeedback] = useState<string | null>(null);
@@ -122,6 +122,11 @@ export function Settings() {
   const handleResetNoAdsForTesting = () => {
     setAdRemoved(false);
     setIapFeedback('테스트용으로 광고 제거 상태를 초기화했어요.');
+  };
+
+  const handleClearAdSkipTicketsForTesting = () => {
+    clearAdSkipTickets();
+    setIapFeedback('테스트용으로 광고 스킵권을 초기화했어요.');
   };
 
   const handleInspectNoAdsOrderStatus = async () => {
@@ -256,38 +261,51 @@ export function Settings() {
             </div>
           </motion.div>
 
-          {!adRemoved && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="rounded-2xl bg-white p-5"
-            >
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">광고</p>
-              <button
-                onClick={handlePurchaseNoAds}
-                disabled={iapLoading}
-                className="mb-2 w-full rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 py-3.5 font-semibold text-white shadow disabled:opacity-60"
-              >
-                {iapLoading ? '처리 중...' : `광고 제거${getNoAdsPrice() ? ` (${getNoAdsPrice()})` : ''}`}
-              </button>
-              <button
-                onClick={handleRestorePurchases}
-                disabled={iapLoading}
-                className="w-full py-2.5 text-sm text-gray-400 disabled:opacity-50"
-              >
-                구매 복원
-              </button>
-              {iapFeedback && (
-                <p className="mt-3 text-center text-sm text-gray-500">
-                  {iapFeedback}
-                </p>
-              )}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="rounded-2xl bg-white p-5"
+          >
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">광고</p>
+            {adRemoved ? (
+              <div className="rounded-xl bg-purple-50 px-4 py-3">
+                <p className="text-xs font-semibold text-purple-500">광고 제거 이용 중</p>
+                <p className="mt-1 text-sm font-bold text-gray-800">전면광고가 표시되지 않아요.</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-3 rounded-xl bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold text-emerald-500">광고 스킵권</p>
+                  <p className="mt-1 text-sm font-bold text-gray-800">{adSkipTickets.toLocaleString()}개 보유</p>
+                </div>
+                <button
+                  onClick={handlePurchaseNoAds}
+                  disabled={iapLoading}
+                  className="mb-2 w-full rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 py-3.5 font-semibold text-white shadow disabled:opacity-60"
+                >
+                  {iapLoading ? '처리 중...' : `광고 제거${getNoAdsPrice() ? ` (${getNoAdsPrice()})` : ''}`}
+                </button>
+                <button
+                  onClick={handleRestorePurchases}
+                  disabled={iapLoading}
+                  className="w-full py-2.5 text-sm text-gray-400 disabled:opacity-50"
+                >
+                  구매 복원
+                </button>
+              </>
+            )}
+            {iapFeedback && (
+              <p className="mt-3 text-center text-sm text-gray-500">
+                {iapFeedback}
+              </p>
+            )}
+            {!adRemoved && (
               <p className="mt-2 text-xs text-gray-400">
                 결제 취소는 즉시 취소 처리되며, 결제 완료 후 오류 시에는 구매 복원으로 다시 지급할 수 있어요.
               </p>
-            </motion.div>
-          )}
+            )}
+          </motion.div>
 
           {import.meta.env.DEV && (
             <motion.div
@@ -309,6 +327,12 @@ export function Settings() {
                 className="mt-2 w-full rounded-xl border border-amber-300 bg-white py-3 text-sm font-semibold text-amber-700 disabled:opacity-60"
               >
                 주문 상태 점검
+              </button>
+              <button
+                onClick={handleClearAdSkipTicketsForTesting}
+                className="mt-2 w-full rounded-xl border border-amber-300 bg-white py-3 text-sm font-semibold text-amber-700"
+              >
+                광고 스킵권 초기화
               </button>
             </motion.div>
           )}

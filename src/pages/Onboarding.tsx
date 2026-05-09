@@ -22,11 +22,22 @@ const DAILY_GOALS = [
   { minutes: 5, label: '5분', desc: '집중' },
 ];
 
+const NICKNAME_ACTIONS = ['별 보는', '하트 든', '책 읽는', '메모하는', '집중한', '카드 든', '달 보는', '문제 푸는'];
+const NICKNAME_ANIMALS = ['토끼', '여우', '수달', '고양이', '부엉이', '다람쥐', '판다', '고래'];
+
 type OnboardingStep = 'nickname' | 'tracking' | 'goal' | 'daily';
 
 function getSafeRedirectPath(raw: string | null) {
   if (!raw) return '/';
   return raw.startsWith('/') ? raw : '/';
+}
+
+function pickRandomItem<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function createDefaultNickname(): string {
+  return `${pickRandomItem(NICKNAME_ACTIONS)} ${pickRandomItem(NICKNAME_ANIMALS)}`;
 }
 
 export function Onboarding() {
@@ -41,7 +52,7 @@ export function Onboarding() {
   );
 
   const [step, setStep] = useState<OnboardingStep>('nickname');
-  const [nickname, setNicknameLocal] = useState('');
+  const [nickname, setNicknameLocal] = useState(() => createDefaultNickname());
   const [goal, setGoal] = useState<TrainingGoal>('memory');
   const [dailyGoal, setDailyGoal] = useState(3);
   const [nicknameError, setNicknameError] = useState(false);
@@ -80,8 +91,10 @@ export function Onboarding() {
 
   useEffect(() => {
     if (!shouldUseManualKeyboardAvoidance) {
-      setKeyboardHeight(0);
-      setNicknameLift(0);
+      queueMicrotask(() => {
+        setKeyboardHeight(0);
+        setNicknameLift(0);
+      });
       return;
     }
 
@@ -136,19 +149,6 @@ export function Onboarding() {
   }, [shouldUseManualKeyboardAvoidance]);
 
   useEffect(() => {
-    if (platform !== 'android' || step !== 'nickname') return;
-
-    const timer = window.setTimeout(() => {
-      inputRef.current?.focus({ preventScroll: true });
-      void Keyboard.show();
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [platform, step]);
-
-  useEffect(() => {
     if (!isNicknameFocused || step !== 'nickname' || keyboardInset <= 0) return;
 
     const timer = window.setTimeout(() => {
@@ -162,7 +162,7 @@ export function Onboarding() {
 
   useEffect(() => {
     if (keyboardInset > 0 || isNicknameFocused) return;
-    setNicknameLift(0);
+    queueMicrotask(() => setNicknameLift(0));
     containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [isNicknameFocused, keyboardInset]);
 
@@ -202,13 +202,13 @@ export function Onboarding() {
       lastModuleId: 'word-memory',
       onboardingComplete: true,
       diagnosisComplete: false,
-      diagnosisDeferred: false,
+      diagnosisDeferred: true,
       baselineScore: 0,
       createdAt: new Date().toISOString(),
     };
     setProfile(profile);
     setNickname(nickname.trim());
-    navigate(`/diagnosis?redirect=${encodeURIComponent(redirectPath)}`);
+    navigate(redirectPath, { replace: true });
   };
 
   return (
@@ -263,9 +263,8 @@ export function Onboarding() {
                       onKeyDown={e => e.key === 'Enter' && handleNicknameNext()}
                       onFocus={() => setIsNicknameFocused(true)}
                       onBlur={() => setIsNicknameFocused(false)}
-                      placeholder="이름 또는 별명을 입력하세요"
-                      maxLength={10}
-                      autoFocus
+                      placeholder="원하는 닉네임으로 바꿀 수 있어요"
+                      maxLength={16}
                       animate={nicknameError ? { x: [0, -8, 8, -5, 5, 0] } : {}}
                       transition={{ duration: 0.35 }}
                       className={`w-full px-4 py-3 rounded-xl border-2 text-gray-800 outline-none transition-colors ${nicknameError ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-purple-400'
@@ -274,13 +273,16 @@ export function Onboarding() {
                     {nicknameError && (
                       <p className="mt-1.5 text-xs text-red-500">닉네임을 입력해 주세요</p>
                     )}
+                    {!nicknameError && (
+                      <p className="mt-1.5 text-xs text-gray-400">마음에 들면 그대로 시작해도 돼요</p>
+                    )}
                     <motion.button
                       onClick={handleNicknameNext}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       className="w-full mt-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow"
                     >
-                      다음
+                      이 이름으로 시작하기
                     </motion.button>
                   </div>
                 </div>
